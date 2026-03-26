@@ -7,8 +7,8 @@ import { useCartStore } from '@/lib/store';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import {
-  Store, LogIn, LogOut, LayoutDashboard, Calculator,
-  ShoppingCart, Menu, ArrowLeft
+  ShoppingBag, LogIn, LogOut, LayoutDashboard, Calculator,
+  ShoppingCart, Menu
 } from 'lucide-react';
 
 export type NavbarVariant = 'storefront' | 'pos' | 'admin' | 'auth';
@@ -30,8 +30,8 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
     return (
       <header className="h-16 bg-muted/30 border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
         <Link href="/" className="flex items-center gap-3 text-primary hover:opacity-80 transition-opacity">
-          <Store className="h-7 w-7" />
-          <span className="font-bold text-xl tracking-tight hidden sm:block">ModernStore</span>
+          <ShoppingBag className="h-7 w-7" />
+          <span className="font-bold text-xl tracking-tight hidden sm:block">StarMart</span>
         </Link>
         <ThemeToggle />
       </header>
@@ -51,11 +51,8 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex items-center gap-2">
-            <Store className="h-6 w-6 text-primary" />
+            <ShoppingBag className="h-6 w-6 text-primary" />
             <span className="font-bold border-r border-border pr-2 ml-2">Admin</span>
-            <Link href="/" className="text-sm text-primary flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4"/> Back to Storefront
-            </Link>
           </div>
           <ThemeToggle />
         </header>
@@ -63,9 +60,6 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
         {/* Desktop Top Bar */}
         <header className="hidden lg:flex h-16 shrink-0 items-center justify-end border-b border-border bg-muted/30 px-6 gap-4">
             <ThemeToggle />
-            <Link href="/" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4"/> Back to Storefront
-            </Link>
         </header>
       </>
     );
@@ -77,10 +71,10 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
       <header className="h-16 bg-muted/30 border-b border-border flex items-center justify-between px-4 lg:px-6 shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-primary">
-            <Store className="h-6 w-6" />
-            <span className="font-bold text-lg hidden sm:block text-foreground">POS System</span>
+            <ShoppingBag className="h-6 w-6" />
+            <span className="font-bold text-lg hidden sm:block text-foreground">StarMart</span>
           </div>
-          {user?.role === 'MANAGER' && (
+          {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
             <Link href="/admin" className="text-sm font-medium text-info hover:underline hidden sm:block">
               Admin Panel
             </Link>
@@ -117,8 +111,8 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
   return (
     <header className="h-16 bg-muted/30 border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
       <Link href="/" className="flex items-center gap-3 text-primary hover:opacity-80 transition-opacity">
-         <Store className="h-7 w-7" />
-         <span className="font-bold text-xl tracking-tight hidden sm:block">ModernStore</span>
+         <ShoppingBag className="h-7 w-7" />
+         <span className="font-bold text-xl tracking-tight hidden sm:block">StarMart</span>
       </Link>
 
       <div className="flex items-center gap-3 sm:gap-4">
@@ -131,7 +125,7 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
            </Link>
          ) : (
            <div className="flex items-center gap-2 sm:gap-3">
-              {user.role === 'MANAGER' && (
+              {(user.role === 'MANAGER' || user.role === 'ADMIN') && (
                 <Link href="/admin">
                   <Button variant="ghost" size="sm" className="gap-2 text-info">
                     <LayoutDashboard className="h-4 w-4" />
@@ -141,7 +135,7 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
               )}
               {user.role === 'CASHIER' && (
                 <Link href="/pos">
-                  <Button variant="ghost" size="sm" className="gap-2 text-indigo-500">
+                  <Button variant="ghost" size="sm" className="gap-2 text-primary">
                     <Calculator className="h-4 w-4" />
                     <span className="hidden sm:inline">POS System</span>
                   </Button>
@@ -171,7 +165,7 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
         >
           <ShoppingCart className="h-5 w-5" />
           {cartItemCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-foreground text-background text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-sm">
+            <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-sm">
               {cartItemCount}
             </span>
           )}

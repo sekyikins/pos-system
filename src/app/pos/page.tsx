@@ -1,27 +1,34 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCartStore, useToastStore } from '@/lib/store';
-import { getProducts, getProductByBarcode } from '@/lib/mock-db';
+import { getProducts, getProductByBarcode } from '@/lib/db';
 import { Product } from '@/lib/types';
 import { Navbar } from '@/components/layout/Navbar';
 import { CartSidebar } from '@/components/cart/CartSidebar';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { Search } from 'lucide-react';
+import { ShoppingCart, ShoppingBag, Search } from 'lucide-react';
+import { OnlineOrdersList } from '@/components/pos/OnlineOrdersList';
 
 export default function POSPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const cart = useCartStore();
   const { addToast } = useToastStore();
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const [products] = useState<Product[]>(getProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [lastBarcodeHit, setLastBarcodeHit] = useState<string | null>(null);
+  const [view, setView] = useState<'POS' | 'ONLINE'>('POS');
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    getProducts().then(setProducts).finally(() => setIsLoadingProducts(false));
+  }, []);
+
+  const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setSearchQuery(val);
     
@@ -29,8 +36,9 @@ export default function POSPage() {
       setLastBarcodeHit(null);
       return;
     }
-    const match = getProductByBarcode(val.trim());
-    if (match && match.barcode === val.trim() && lastBarcodeHit !== val.trim()) {
+    if (lastBarcodeHit === val.trim()) return;
+    const match = await getProductByBarcode(val.trim());
+    if (match && match.barcode === val.trim()) {
       setLastBarcodeHit(val.trim());
       if (match.quantity > 0) {
         cart.addItem(match);
@@ -57,7 +65,7 @@ export default function POSPage() {
     addToast(`Added ${product.name}`, 'success');
   };
 
-  if (isLoading || !user || user.role === 'CUSTOMER') return null;
+  if (authLoading || !user) return null;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans">
@@ -67,13 +75,31 @@ export default function POSPage() {
           onMobileCartToggle={() => setIsMobileCartOpen(true)}
         />
 
-        <div className="px-4 lg:px-6 py-3 shrink-0 bg-card border-b border-border shadow-sm">
-          <div className="relative max-w-2xl mx-auto">
+        <div className="px-4 lg:px-6 py-3 shrink-0 bg-card border-b border-border shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex bg-muted/30 p-1 rounded-2xl w-full sm:w-auto">
+             <button
+               onClick={() => setView('POS')}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
+             >
+               <ShoppingCart className="h-4 w-4" />
+               Checkout
+             </button>
+             <button
+               onClick={() => setView('ONLINE')}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
+             >
+               <ShoppingBag className="h-4 w-4" />
+               Online Orders
+             </button>
+          </div>
+
+          <div className="relative w-full max-w-lg">
             <Search className="absolute left-3.5 top-3 h-5 w-5 text-muted-foreground/60" />
             <input
               ref={searchRef}
-              className="w-full h-11 rounded-xl border border-border bg-muted/50 pl-11 pr-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-base transition-all placeholder:text-muted-foreground/50"
-              placeholder="Search by name, category or scan barcode..."
+              disabled={view === 'ONLINE'}
+              className="w-full h-11 rounded-xl border border-border bg-muted/50 pl-11 pr-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-base transition-all placeholder:text-muted-foreground/50 disabled:opacity-50"
+              placeholder={view === 'POS' ? "Search by name, category or scan barcode..." : "Global Search..."}
               value={searchQuery}
               onChange={handleSearchChange}
               autoFocus
@@ -82,12 +108,17 @@ export default function POSPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 lg:p-5">
-          <ProductGrid 
-            products={filteredProducts}
-            searchQuery={searchQuery}
-            variant="pos"
-            onAddToCart={handleAddToCart}
-          />
+          {view === 'POS' ? (
+            <ProductGrid 
+              products={filteredProducts}
+              searchQuery={searchQuery}
+              variant="pos"
+              onAddToCart={handleAddToCart}
+              isLoading={isLoadingProducts}
+            />
+          ) : (
+            <OnlineOrdersList />
+          )}
         </div>
       </div>
 

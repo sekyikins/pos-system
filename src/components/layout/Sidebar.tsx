@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Store, Package, Users, BarChart3, LogOut, X } from 'lucide-react';
+import { ShoppingBag, Package, Users, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 interface SidebarProps {
@@ -16,12 +16,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
 
-  const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: BarChart3 },
-    { name: 'Products', href: '/admin/products', icon: Package },
-    { name: 'Inventory', href: '/admin/inventory', icon: Store },
-    { name: 'Customers', href: '/admin/customers', icon: Users },
-  ];
+    const allNavigation = [
+      { name: 'Dashboard', href: '/admin', icon: BarChart3, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Categories', href: '/admin/categories', icon: Package, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Products', href: '/admin/products', icon: Package, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Inventory', href: '/admin/inventory', icon: Archive, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Sales', href: '/admin/sales', icon: ShoppingCart, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Online Orders', href: '/admin/online-orders', icon: ShoppingBag, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
+      { name: 'Delivery Points', href: '/admin/delivery-points', icon: Package, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Reports', href: '/admin/reports', icon: PieChart, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Customers', href: '/admin/customers', icon: Users, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Staff', href: '/admin/staff', icon: UserCog, roles: ['ADMIN', 'MANAGER'] },
+    ];
+
+    const navigation = allNavigation.filter(item => item.roles.includes(user?.role || ''));
 
   return (
     <>
@@ -41,7 +49,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="flex h-16 items-center bg-muted/30 justify-between px-6 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
-            <Store className="h-6 w-6 text-primary" />
+            <ShoppingBag className="h-6 w-6 text-primary" />
             <span className="text-lg font-bold">Admin Panel</span>
           </div>
           <button 
@@ -59,7 +67,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-muted/50 text-secondary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-muted/40 hover:text-primary'

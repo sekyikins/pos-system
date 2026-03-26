@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCartStore, useToastStore } from '@/lib/store';
-import { processSale } from '@/lib/mock-db';
+import { processSale } from '@/lib/db';
 import { useAuth } from '@/lib/auth';
 import { Banknote, CreditCard, Smartphone } from 'lucide-react';
 
@@ -13,18 +13,18 @@ interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: (saleId: string) => void;
-  customerId?: string;
   discount: number;
   finalTotal: number;
+  customerId?: string;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
   onComplete,
-  customerId,
   discount,
   finalTotal,
+  customerId,
 }) => {
   const cart = useCartStore();
   const { addToast } = useToastStore();
@@ -43,9 +43,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     setIsProcessing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 700));
-
-      const sale = processSale({
+      const sale = await processSale({
         cashierId: user?.id || 'unknown',
         customerId,
         items: cart.items.map(item => ({ ...item })),
@@ -104,11 +102,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <span className="text-muted-foreground text-base">Total Due</span>
             <span className="font-black text-3xl">${finalTotal.toFixed(2)}</span>
           </div>
-          {customerId && (
-            <p className="text-xs text-warning pt-1">
-              🏆 Customer will earn {Math.round(finalTotal)} loyalty points
-            </p>
-          )}
+
         </div>
 
         {/* Cash Tendered */}
@@ -126,7 +120,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               autoFocus
             />
             {given > 0 && (
-              <div className={`p-3 rounded-lg flex justify-between items-center font-semibold ${
+              <div className={`p-3 rounded-xl flex justify-between items-center font-semibold ${
                 change >= 0
                   ? 'bg-success/10 text-success'
                   : 'bg-destructive/10 text-destructive'

@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { getUserByUsername } from '@/lib/mock-db';
+import { getUserByUsername } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { Store } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import Link from 'next/link';
 
@@ -23,16 +23,12 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const user = getUserByUsername(username);
+      const user = await getUserByUsername(username);
       if (!user) {
         setError('Invalid username or password');
         return;
       }
 
-      // In the mock, passwords for our test users are all 'password'
       const isValid = await bcrypt.compare(password, user.passwordHash);
       if (isValid) {
         login(user);
@@ -51,7 +47,7 @@ export default function LoginPage() {
       <CardHeader className="space-y-1 text-center">
         <div className="flex justify-center mb-4">
           <div className="rounded-full bg-primary/10 p-3">
-            <Store className="h-6 w-6 text-primary" />
+            <ShoppingBag className="h-6 w-6 text-primary" />
           </div>
         </div>
         <CardTitle className="text-2xl">Sign In</CardTitle>
@@ -111,9 +107,9 @@ export default function LoginPage() {
           <div className="w-full pt-4 border-t border-border">
              <p className="text-center w-full mb-2 text-xs">Test Accounts (Password: &apos;password&apos;)</p>
               <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                <div className="bg-muted/50 p-2 rounded">admin</div>
                 <div className="bg-muted/50 p-2 rounded">manager</div>
                 <div className="bg-muted/50 p-2 rounded">cashier</div>
-                <div className="bg-muted/50 p-2 rounded">customer</div>
               </div>
           </div>
        </CardFooter>

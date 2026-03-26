@@ -6,8 +6,8 @@ import { LayoutContent } from '@/components/layout/LayoutContent';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ModernStore',
-  description: 'A mobile-first, responsive Point of Sale system',
+  title: 'StarMart',
+  description: 'A responsive Point of Sale system built to simplify retail operations, helping businesses manage sales, inventory, and transactions in real time.',
   icons: {
     icon: '/favicon.png',
   },
@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className}`}>
+      <body className={`${inter.className}`} suppressHydrationWarning>
         <LayoutContent>{children}</LayoutContent>
       </body>
     </html>

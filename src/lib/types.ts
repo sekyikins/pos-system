@@ -1,19 +1,20 @@
-export type Role = 'MANAGER' | 'CASHIER' | 'CUSTOMER';
+export type Role = 'ADMIN' | 'MANAGER' | 'CASHIER';
 
 /** Full DB row — includes the hashed password. Never store this in app state. */
-export interface UserRecord {
+export interface StaffRecord {
   id: string;
   name: string;
   username: string;
   passwordHash: string;
   role: Role;
+  createdAt: string;
 }
 
 /** Safe user object stored in auth context / localStorage — no password hash. */
-export type AuthUser = Omit<UserRecord, 'passwordHash'>;
+export type AuthUser = Omit<StaffRecord, 'passwordHash'>;
 
 /** Alias kept for mock-db.ts compatibility. */
-export type User = UserRecord;
+export type User = StaffRecord;
 
 export interface Product {
   id: string;
@@ -24,13 +25,43 @@ export interface Product {
   barcode: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface DeliveryPoint {
+  id: string;
+  name: string;
+  address: string;
+  active: boolean;
+}
+
+export interface OnlineOrder {
+  id: string;
+  eCustomerId: string | null;
+  deliveryPointId: string | null;
+  deliveryAddress: string | null;
+  totalAmount: number;
+  paymentMethod: 'CARD' | 'MOBILE_MONEY' | 'PAY_ON_DELIVERY';
+  paymentReference: string | null;
+  processedBy: string | null; // Staff ID who completed/cancelled the order
+  processingStaffId: string | null; // Staff ID who started processing
+  processingStartedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
   phone?: string;
   email?: string;
-  address?: string;
-  loyaltyPoints: number;
+  loyalty_points: number;
+  order_count?: number;
+  type?: 'POS' | 'ECOMMERCE';
+  created_at?: string;
 }
 
 export interface SalesItem {
@@ -45,7 +76,7 @@ export interface SalesItem {
 export interface Sale {
   id: string;
   cashierId: string; // The user ID Who processed this
-  customerId?: string; // Optional, if linked
+  customerId?: string; // Optional POS Customer ID
   items: SalesItem[];
   totalAmount: number;
   discount: number;

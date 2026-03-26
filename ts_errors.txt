@@ -1,0 +1,5 @@
+.next/dev/types/validator.ts(51,39): error TS2307: Cannot find module '../../../src/app/admin/customers/page.js' or its corresponding type declarations.
+src/app/admin/sales/page.tsx(8,20): error TS2305: Module '"@/lib/db"' has no exported member 'getCustomerById'.
+src/app/admin/sales/page.tsx(37,14): error TS2339: Property 'customerId' does not exist on type 'Sale'.
+src/app/admin/sales/page.tsx(38,44): error TS2339: Property 'customerId' does not exist on type 'Sale'.
+src/app/pos/page.tsx(10,29): error TS2307: Cannot find module '@/components/product/ProductGrid' or its corresponding type declarations.

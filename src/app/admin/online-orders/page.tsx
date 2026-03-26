@@ -1,0 +1,220 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Badge } from '@/components/ui/Badge';
+import { OnlineOrder, DeliveryPoint } from '@/lib/types';
+import { getOnlineOrders, updateOnlineOrderStatus, getDeliveryPoints } from '@/lib/db';
+import { useToastStore } from '@/lib/store';
+import { Search, ShoppingBag, Eye } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useCallback } from 'react';
+
+const STATUS_BADGE = {
+  PENDING: { label: 'Pending', class: 'bg-warning/10 text-warning border-warning/20' },
+  CONFIRMED: { label: 'Confirmed', class: 'bg-info/10 text-info border-info/20' },
+  SHIPPED: { label: 'Shipped', class: 'bg-primary/10 text-primary border-primary/20' },
+  DELIVERED: { label: 'Delivered', class: 'bg-success/10 text-success border-success/20' },
+  CANCELLED: { label: 'Cancelled', class: 'bg-destructive/10 text-destructive border-destructive/20' },
+};
+
+export default function OnlineOrdersPage() {
+  const [orders, setOrders] = useState<OnlineOrder[]>([]);
+  const [deliveryPoints, setDeliveryPoints] = useState<Record<string, DeliveryPoint>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { addToast } = useToastStore();
+
+  const [selectedOrder, setSelectedOrder] = useState<OnlineOrder | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [fetchedOrders, pts] = await Promise.all([getOnlineOrders(), getDeliveryPoints()]);
+      setOrders(fetchedOrders);
+      
+      const ptsMap: Record<string, DeliveryPoint> = {};
+      pts.forEach(p => ptsMap[p.id] = p);
+      setDeliveryPoints(ptsMap);
+    } catch {
+      addToast('Failed to load orders', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = orders.filter(o =>
+    o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    o.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    o.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    setIsUpdating(true);
+    try {
+      await updateOnlineOrderStatus(orderId, newStatus);
+      addToast(`Order status updated to ${newStatus}`, 'success');
+      await load();
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as OnlineOrder['status'] } : null);
+      }
+    } catch {
+      addToast('Failed to update status', 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Online Orders</h1>
+          <p className="text-sm text-muted-foreground">Manage E-commerce storefront orders</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input placeholder="Search by ID, Status, Route..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-1">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-6 py-4 border-b border-border last:border-0 bg-muted/5 animate-pulse">
+                  <div className="flex items-center gap-2 flex-1"><Skeleton className="h-4 w-4 rounded-full" /><Skeleton className="h-4 w-20" /></div>
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-8 w-12 rounded-md ml-auto" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted/90 text-xs uppercase font-semibold text-muted-foreground border-b border-border">
+                  <tr>
+                    <th className="px-6 py-3">Order ID</th>
+                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3">Delivery Type</th>
+                    <th className="px-6 py-3">Amount</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filtered.length === 0 ? (
+                    <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No orders found.</td></tr>
+                  ) : filtered.map(o => {
+                    const statusBadge = STATUS_BADGE[o.status] || { label: o.status, class: 'bg-muted text-muted-foreground' };
+                    const isPickup = !!o.deliveryPointId;
+                    
+                    return (
+                      <tr key={o.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-6 py-4 font-mono text-xs flex items-center gap-2">
+                          <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                          {o.id.slice(0, 8).toUpperCase()}
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-4">
+                          {isPickup ? (
+                            <span className="text-primary font-medium">Pickup ({deliveryPoints[o.deliveryPointId!]?.name || 'Unknown'})</span>
+                          ) : (
+                            <span className="text-info font-medium">Delivery</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-success">${o.totalAmount.toFixed(2)}</td>
+                        <td className="px-6 py-4">
+                          <Badge variant="outline" className={`${statusBadge.class}`}>{statusBadge.label}</Badge>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedOrder(o); setIsViewOpen(true); }}>
+                            <Eye className="h-4 w-4 mr-2" /> View
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Modal isOpen={isViewOpen} onClose={() => setIsViewOpen(false)} title="Order Details">
+        {selectedOrder && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Order ID</p>
+                <p className="font-mono text-sm">{selectedOrder.id}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Date</p>
+                <p className="text-sm">{new Date(selectedOrder.createdAt).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Payment Method</p>
+                <p className="text-sm font-medium">{selectedOrder.paymentMethod.replace(/_/g, ' ')}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Amount</p>
+                <p className="text-sm font-bold text-success">${selectedOrder.totalAmount.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/30 p-4 rounded-xl border border-border">
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Delivery Information</p>
+              {selectedOrder.deliveryPointId ? (
+                <div>
+                  <p className="font-medium text-primary">Store Pickup</p>
+                  <p className="text-sm text-muted-foreground">{deliveryPoints[selectedOrder.deliveryPointId]?.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{deliveryPoints[selectedOrder.deliveryPointId]?.address}</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="font-medium text-info">Home Delivery</p>
+                  <p className="text-sm text-muted-foreground">{selectedOrder.deliveryAddress || 'Address not provided'}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Update Order Status</label>
+              <select 
+                value={selectedOrder.status}
+                onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
+                disabled={isUpdating}
+                className="w-full h-10 px-3 text-sm rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="SHIPPED">Shipped / Ready for Pickup</option>
+                <option value="DELIVERED">Delivered / Picked Up</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-border mt-6">
+              <Button variant="outline" onClick={() => setIsViewOpen(false)}>Close</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}

@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Prevent flash of protected content while auth state is being restored
-  if (isLoading || !user || user.role !== 'MANAGER') return null;
+  if (isLoading || !user || (user.role !== 'MANAGER' && user.role !== 'ADMIN')) return null;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

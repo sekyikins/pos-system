@@ -7,11 +7,11 @@ import { useCartStore, useToastStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Customer, Product } from '@/lib/types';
-import { getCustomers, getProducts } from '@/lib/mock-db';
+import { Product, Customer } from '@/lib/types';
+import { getProducts, getPosCustomers, addPosCustomer } from '@/lib/db';
 import { PaymentModal } from '@/components/pos/PaymentModal';
 import { ReceiptModal } from '@/components/pos/ReceiptModal';
-import { ShoppingCart, X, Minus, Plus, UserCircle, ChevronDown, Tag } from 'lucide-react';
+import { ShoppingCart, X, Minus, Plus, UserCircle, Tag, UserPlus, Search as SearchIcon } from 'lucide-react';
 
 export type CartVariant = 'storefront' | 'pos';
 
@@ -28,23 +28,53 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
   const router = useRouter();
 
   // Reference for products (used for max stock checks)
-  const [products, setProducts] = useState<Product[]>(getProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
+  const [csQuery, setCsQuery] = useState('');
+  const [isQuickAdd, setIsQuickAdd] = useState(false);
+  const [quickAddForm, setQuickAddForm] = useState({ name: '', phone: '' });
+
+  React.useEffect(() => {
+    async function loadData() {
+      const p = await getProducts();
+      setProducts(p);
+      if (variant === 'pos') {
+        try {
+          const c = await getPosCustomers();
+          setAllCustomers(c);
+        } catch (e) { console.error('Customers failed', e); }
+      }
+    }
+    loadData();
+  }, [variant]);
   
-  // POS-specific state
-  const [customers] = useState<Customer[]>(variant === 'pos' ? getCustomers() : []);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const selectedCustomer = allCustomers.find(c => c.id === selectedCustomerId);
+  const filteredCustomers = allCustomers.filter(c => 
+    c.name.toLowerCase().includes(csQuery.toLowerCase()) || 
+    c.phone?.includes(csQuery)
+  );
+
+  const handleQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAddForm.name) return;
+    try {
+      const newC = await addPosCustomer({ name: quickAddForm.name, phone: quickAddForm.phone || undefined });
+      setAllCustomers(prev => [...prev, newC]);
+      setSelectedCustomerId(newC.id);
+      setIsQuickAdd(false);
+      setIsCustomerSearchOpen(false);
+      setQuickAddForm({ name: '', phone: '' });
+      addToast('Customer added & selected', 'success');
+    } catch { addToast('Failed to add customer', 'error'); }
+  };
+  
   const [discountValue, setDiscountValue] = useState('0');
   const [discountType, setDiscountType] = useState<'FLAT' | 'PERCENT'>('FLAT');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [lastSaleId, setLastSaleId] = useState<string | null>(null);
-
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    (c.phone && c.phone.includes(customerSearch))
-  );
 
   const subtotal = cart.getTotal();
   let discountAmount = 0;
@@ -61,9 +91,9 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
     if (variant === 'storefront') {
       if (!user) {
         addToast('Please sign in to complete checkout', 'info');
-        router.push('/login');
+        router.replace('/login');
       } else {
-        router.push('/checkout');
+        router.replace('/checkout');
       }
     } else {
       setIsPaymentOpen(true);
@@ -108,56 +138,114 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
            </div>
         </div>
 
-        {/* POS Customer Extension */}
-        {variant === 'pos' && (
-          <div className="p-3 border-b border-border shrink-0">
-            <div className="relative">
-              <button
-                onClick={() => setIsCustomerDropdownOpen(prev => !prev)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm hover:border-primary/50 transition-colors"
-              >
-                <UserCircle className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="flex-1 text-left truncate">
-                  {selectedCustomer ? selectedCustomer.name : <span className="text-muted-foreground/60">Link a customer (optional)</span>}
-                </span>
-                {selectedCustomer && (
-                  <span className="text-xs text-primary shrink-0 font-bold">{selectedCustomer.loyaltyPoints} pts</span>
-                )}
-                <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-300 ${isCustomerDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
 
-              {isCustomerDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-card border border-border rounded-lg shadow-xl overflow-hidden glass-effect">
-                  <div className="p-2 border-b border-border bg-muted/30">
-                    <input
-                      className="w-full text-sm px-2 py-1.5 rounded border border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary"
-                      placeholder="Search customers..."
-                      value={customerSearch}
-                      onChange={e => setCustomerSearch(e.target.value)}
-                      autoFocus
-                    />
+        {/* Customer Section (POS only) */}
+        {variant === 'pos' && (
+          <div className="px-4 py-3 border-b border-border bg-muted/20 shrink-0">
+            {!selectedCustomer ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                fullWidth 
+                className="justify-start gap-2 h-10 border-dashed"
+                onClick={() => setIsCustomerSearchOpen(true)}
+              >
+                <UserPlus className="h-4 w-4" /> Select Customer
+              </Button>
+            ) : (
+              <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl p-2.5">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                    <UserCircle className="h-5 w-5" />
                   </div>
-                  <div className="max-h-40 overflow-y-auto">
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
-                      onClick={() => { setSelectedCustomer(null); setIsCustomerDropdownOpen(false); }}
-                    >
-                      — No customer
-                    </button>
-                    {filteredCustomers.map(c => (
-                      <button
-                        key={c.id}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex justify-between items-center transition-colors"
-                        onClick={() => { setSelectedCustomer(c); setIsCustomerDropdownOpen(false); setCustomerSearch(''); }}
-                      >
-                        <span className="font-medium">{c.name}</span>
-                        <span className="text-xs text-muted-foreground">{c.loyaltyPoints} pts</span>
-                      </button>
-                    ))}
+                  <div className="overflow-hidden">
+                    <div className="text-sm font-bold truncate">{selectedCustomer.name}</div>
+                    <div className="text-[10px] text-muted-foreground">{selectedCustomer.phone || 'No phone'}</div>
                   </div>
                 </div>
-              )}
-            </div>
+                <button onClick={() => setSelectedCustomerId(null)} className="p-1.5 hover:bg-primary/20 rounded-full text-primary transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Customer Search / Quick Add Modal-ish Overlay */}
+            {isCustomerSearchOpen && (
+              <div className="absolute inset-x-0 top-[60px] bottom-0 z-30 bg-card flex flex-col animate-in slide-in-from-top duration-200">
+                <div className="p-4 border-b border-border flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm">Customer Lookup</h3>
+                    <button onClick={() => setIsCustomerSearchOpen(false)} className="p-1 hover:bg-muted rounded-md"><X className="h-4 w-4" /></button>
+                  </div>
+                  
+                  {!isQuickAdd ? (
+                    <>
+                      <div className="relative">
+                        <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <input 
+                          autoFocus
+                          placeholder="Search customers..." 
+                          className="w-full h-9 pl-9 pr-3 rounded-lg border border-border bg-muted focus:ring-1 focus:ring-primary outline-none text-sm"
+                          value={csQuery}
+                          onChange={e => setCsQuery(e.target.value)}
+                        />
+                      </div>
+                      <Button variant="ghost" size="sm" fullWidth className="h-9 gap-1 text-primary" onClick={() => setIsQuickAdd(true)}>
+                        <UserPlus className="h-4 w-4" /> Add New Customer
+                      </Button>
+                    </>
+                  ) : (
+                    <form onSubmit={handleQuickAdd} className="space-y-3 p-1">
+                       <div className="text-xs font-semibold uppercase text-muted-foreground/60">Quick Add</div>
+                       <input 
+                         required 
+                         placeholder="Customer Name" 
+                         className="w-full h-9 px-3 rounded-lg border border-border bg-muted outline-none text-sm"
+                         value={quickAddForm.name}
+                         onChange={e => setQuickAddForm({...quickAddForm, name: e.target.value})}
+                         autoFocus
+                       />
+                       <input 
+                         placeholder="Phone (optional)" 
+                         className="w-full h-9 px-3 rounded-lg border border-border bg-muted outline-none text-sm"
+                         value={quickAddForm.phone}
+                         onChange={e => setQuickAddForm({...quickAddForm, phone: e.target.value})}
+                       />
+                       <div className="flex gap-2">
+                         <Button type="submit" size="sm" fullWidth>Save & Select</Button>
+                         <Button type="button" variant="outline" size="sm" onClick={() => setIsQuickAdd(false)}>Back</Button>
+                       </div>
+                    </form>
+                  )}
+                </div>
+
+                {!isQuickAdd && (
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
+                      <button 
+                        key={c.id} 
+                        className="w-full flex items-center gap-3 p-2.5 hover:bg-muted rounded-xl transition-colors text-left group"
+                        onClick={() => {
+                          setSelectedCustomerId(c.id);
+                          setIsCustomerSearchOpen(false);
+                          setCsQuery('');
+                        }}
+                      >
+                        <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <UserCircle className="h-5 w-5" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <div className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{c.name}</div>
+                          <div className="text-xs text-muted-foreground">{c.phone || 'No phone'}</div>
+                        </div>
+                      </button>
+                    )) : (
+                      <div className="py-8 text-center text-sm text-muted-foreground">No matches found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -183,7 +271,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                  <div key={item.id} className={`flex gap-4 relative ${
                    variant === 'storefront' 
                      ? 'bg-card rounded-xl shadow-sm p-4 border border-border'
-                     : 'flex flex-col gap-1.5 bg-muted/40 rounded-lg p-3'
+                     : 'flex flex-col gap-1.5 bg-muted/40 rounded-xl p-3'
                  }`}>
                     {variant === 'storefront' && (
                       <button 
@@ -211,9 +299,9 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                          {variant === 'pos' && (
                             <span className="text-xs text-muted-foreground/60">${item.price.toFixed(2)} each</span>
                          )}
-                         <div className={`flex items-center gap-1 border dark:border-slate-700 ${
+                         <div className={`flex items-center gap-1 ${
                            variant === 'storefront' 
-                             ? 'bg-muted/50 rounded-lg p-1 border border-border' 
+                             ? 'bg-muted/50 rounded-xl p-1 border border-border' 
                              : 'bg-card rounded-full px-1 py-0.5 border border-border'
                          }`}>
                             <button 
@@ -354,16 +442,16 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
         <PaymentModal
           isOpen={isPaymentOpen}
           onClose={() => setIsPaymentOpen(false)}
-          customerId={selectedCustomer?.id}
           discount={discountAmount}
           finalTotal={finalTotal}
+          customerId={selectedCustomerId || undefined}
           onComplete={(saleId) => {
             setIsPaymentOpen(false);
             setLastSaleId(saleId);
             setIsReceiptOpen(true);
-            setSelectedCustomer(null);
             setDiscountValue('0');
-            setProducts(getProducts()); // refresh product stock
+            setSelectedCustomerId(null);
+            getProducts().then(setProducts); // refresh product stock
           }}
         />
       )}

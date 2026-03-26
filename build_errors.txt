@@ -1,0 +1,43 @@
+
+> pos-system@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.7 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./src/app/pos/page.tsx:10:1
+Module not found: Can't resolve '@/components/product/ProductGrid'
+   8 | import { Navbar } from '@/components/layout/Navbar';
+   9 | import { CartSidebar } from '@/components/cart/CartSidebar';
+> 10 | import { ProductGrid } from '@/components/product/ProductGrid';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  11 | import { Search } from 'lucide-react';
+  12 |
+  13 | export default function POSPage() {
+
+Import map: aliased to relative './src/components/product/ProductGrid' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/pos/page.tsx [Client Component Browser]
+    ./src/app/pos/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/pos/page.tsx [Client Component SSR]
+    ./src/app/pos/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/app/pos/page.tsx:10:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+npm notice
+npm notice New minor version of npm available! 11.11.0 -> 11.12.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.12.0
+npm notice To update run: npm install -g npm@11.12.0
+npm notice
