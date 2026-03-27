@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Product, Category } from '@/lib/types';
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function ProductsPage() {

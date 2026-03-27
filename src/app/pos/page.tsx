@@ -9,7 +9,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { CartSidebar } from '@/components/cart/CartSidebar';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ShoppingCart, ShoppingBag, Search } from 'lucide-react';
-import { OnlineOrdersList } from '@/components/pos/OnlineOrdersList';
+import { OnlineOrdersList } from '@/components/pos';
 
 export default function POSPage() {
   const { user, isLoading: authLoading } = useAuth();

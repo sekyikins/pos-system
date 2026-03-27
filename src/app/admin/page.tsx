@@ -1,33 +1,43 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { getSales, getProducts } from '@/lib/db';
 import { Sale, Product } from '@/lib/types';
-import { CircleDollarSign, Package, TrendingUp, AlertTriangle } from 'lucide-react';
+import { CircleDollarSign, Package, TrendingUp, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+
+function ConnectionDot({ status }: { status: ConnectionStatus }) {
+  if (status === 'connected')    return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+}
 
 export default function AdminDashboard() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({ totalSales: 0, totalRevenue: 0, totalProducts: 0, lowStock: 0 });
-  const [recentSales, setRecentSales] = useState<Sale[]>([]);
-  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const { data: products, isLoading: loadingProducts, connectionStatus: prodStatus } = useRealtimeTable<Product>({
+    table: 'products',
+    initialData: [],
+    fetcher: getProducts,
+  });
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [products, sales] = await Promise.all([getProducts(), getSales()]);
-        const revenue = sales.reduce((acc, s) => acc + s.finalAmount, 0);
-        const lowStock = products.filter(p => p.quantity < 10);
-        setStats({ totalSales: sales.length, totalRevenue: revenue, totalProducts: products.length, lowStock: lowStock.length });
-        setRecentSales(sales.slice(0, 6));
-        setLowStockProducts(lowStock.slice(0, 6));
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, []);
+  const { data: sales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
+    table: 'sales',
+    initialData: [],
+    fetcher: getSales,
+  });
+
+  const isLoading = loadingProducts || loadingSales;
+  const connectionStatus: ConnectionStatus = prodStatus === 'connected' && salesStatus === 'connected' ? 'connected' : prodStatus === 'error' || salesStatus === 'error' ? 'error' : 'connecting';
+
+  const stats = useMemo(() => {
+    const revenue = sales.reduce((acc, s) => acc + s.finalAmount, 0);
+    const lowStock = products.filter(p => p.quantity < 10);
+    return { totalSales: sales.length, totalRevenue: revenue, totalProducts: products.length, lowStock: lowStock.length };
+  }, [products, sales]);
+
+  const recentSales = useMemo(() => [...sales].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 6), [sales]);
+  const lowStockProducts = useMemo(() => products.filter(p => p.quantity < 10).slice(0, 6), [products]);
 
   if (isLoading) return (
     <div className="space-y-6">
@@ -35,46 +45,35 @@ export default function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-32 mb-2" />
-              <Skeleton className="h-3 w-20" />
-            </CardContent>
+            <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+            <CardContent><Skeleton className="h-8 w-32 mb-2" /><Skeleton className="h-3 w-20" /></CardContent>
           </Card>
         ))}
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-          <CardContent className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex justify-between items-center pb-3 border-b border-border/50">
-                <div className="space-y-2 flex-1"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-3 w-1/2" /></div>
-                <Skeleton className="h-5 w-16" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-          <CardContent className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex justify-between items-center pb-3 border-b border-border/50">
-                <div className="space-y-2 flex-1"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-3 w-1/2" /></div>
-                <Skeleton className="h-5 w-16" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        {[0, 1].map(i => (
+          <Card key={i}>
+            <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+            <CardContent className="space-y-4">
+              {[...Array(5)].map((_, j) => (
+                <div key={j} className="flex justify-between items-center pb-3 border-b border-border/50">
+                  <div className="space-y-2 flex-1"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-3 w-1/2" /></div>
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
+        <ConnectionDot status={connectionStatus} />
+      </div>
 
       {/* Stat Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -126,15 +125,13 @@ export default function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2">
         {/* Recent Sales */}
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Recent Sales</CardTitle></CardHeader>
           <CardContent>
             {recentSales.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No sales recorded yet.</p>
             ) : (
               <div className="space-y-4">
-                {recentSales.map(sale => (
+                {recentSales.map((sale: Sale) => (
                   <div key={sale.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
                     <div className="space-y-1">
                       <p className="text-sm font-medium leading-none">Order #{sale.id.slice(-6)}</p>
@@ -162,7 +159,7 @@ export default function AdminDashboard() {
               <p className="text-sm text-muted-foreground text-center py-4">All products are well stocked.</p>
             ) : (
               <div className="space-y-3">
-                {lowStockProducts.map(p => (
+                {lowStockProducts.map((p: Product) => (
                   <div key={p.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
                     <div>
                       <p className="text-sm font-medium">{p.name}</p>

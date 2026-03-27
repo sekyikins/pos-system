@@ -179,7 +179,7 @@ export async function getSaleById(id: string): Promise<Sale | null> {
   return toSale(data);
 }
 
-export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Promise<Sale> {
+export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'> & { customerType?: 'POS' | 'ECOMMERCE' }): Promise<Sale> {
   // 1. Insert sale
   const { data: saleRow, error: saleErr } = await supabase
     .from('sales')
@@ -228,7 +228,14 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
 
   // 5. Update Loyalty Points (50 pts per purchase day)
   if (saleData.customerId) {
-    const { data: customer } = await supabase.from('customer').select('loyalty_points, last_purchase_date, order_count').eq('id', saleData.customerId).single();
+    const table = saleData.customerType === 'ECOMMERCE' ? 'e_customer' : 'customer';
+    
+    const { data: customer } = await supabase
+      .from(table)
+      .select('loyalty_points, last_purchase_date, order_count')
+      .eq('id', saleData.customerId)
+      .single();
+
     if (customer) {
       const today = new Date().toISOString().split('T')[0];
       const lastDate = customer.last_purchase_date;
@@ -236,9 +243,11 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
       
       if (lastDate !== today) {
         newPoints += 50;
+      } else {
+        newPoints += 10;
       }
 
-      await supabase.from('customer').update({ 
+      await supabase.from(table).update({ 
         loyalty_points: newPoints,
         last_purchase_date: today,
         order_count: Number(customer.order_count || 0) + 1
@@ -305,7 +314,7 @@ export async function getUserByUsername(username: string): Promise<StaffRecord |
   };
 }
 
-export async function addUser(newUser: Omit<StaffRecord, 'id'>): Promise<StaffRecord> {
+export async function addUser(newUser: Omit<StaffRecord, 'id' | 'createdAt'>): Promise<StaffRecord> {
   const { data, error } = await supabase
     .from('pos_staff')
     .insert({
@@ -376,7 +385,7 @@ export async function getPosCustomers(): Promise<Customer[]> {
 export async function addPosCustomer(customer: Omit<Customer, 'id' | 'created_at' | 'loyalty_points'>) {
   const { data, error } = await supabase.from('customer').insert({ ...customer, loyalty_points: 0 }).select().single();
   if (error) throw error;
-  return data;
+  return { ...data, type: 'POS' };
 }
 
 export async function updatePosCustomer(id: string, updates: Partial<Customer>) {

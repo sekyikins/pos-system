@@ -101,8 +101,7 @@ export default function StaffPage() {
         name: addForm.name, 
         username: addForm.username, 
         passwordHash: hash, 
-        role: addForm.role as UserRecord['role'],
-        createdAt: new Date().toISOString()
+        role: addForm.role as UserRecord['role']
       });
       addToast('User created successfully', 'success');
       await load();

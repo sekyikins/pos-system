@@ -16,6 +16,7 @@ interface PaymentModalProps {
   discount: number;
   finalTotal: number;
   customerId?: string;
+  customerType?: 'POS' | 'ECOMMERCE';
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -25,6 +26,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   discount,
   finalTotal,
   customerId,
+  customerType,
 }) => {
   const cart = useCartStore();
   const { addToast } = useToastStore();
@@ -46,6 +48,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       const sale = await processSale({
         cashierId: user?.id || 'unknown',
         customerId,
+        customerType,
         items: cart.items.map(item => ({ ...item })),
         totalAmount: cart.getTotal(),
         discount,

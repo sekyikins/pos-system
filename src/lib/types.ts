@@ -41,17 +41,19 @@ export interface DeliveryPoint {
 export interface OnlineOrder {
   id: string;
   eCustomerId: string | null;
+  status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
   deliveryPointId: string | null;
   deliveryAddress: string | null;
   totalAmount: number;
   paymentMethod: 'CARD' | 'MOBILE_MONEY' | 'PAY_ON_DELIVERY';
   paymentReference: string | null;
-  processedBy: string | null; // Staff ID who completed/cancelled the order
-  processingStaffId: string | null; // Staff ID who started processing
+  processedBy: string | null;
+  processingStaffId: string | null;
   processingStartedAt: string | null;
   completedAt: string | null;
   createdAt: string;
 }
+
 
 export interface Customer {
   id: string;

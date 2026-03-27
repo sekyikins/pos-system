@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,40 +9,36 @@ import { Badge } from '@/components/ui/Badge';
 import { Customer } from '@/lib/types';
 import { getPosCustomers, addPosCustomer, updatePosCustomer, deletePosCustomer } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store, Wifi, WifiOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 
 type SortKey = 'name' | 'date' | 'loyalty';
 
+function ConnBadge({ status }: { status: ConnectionStatus }) {
+  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+}
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const { addToast } = useToastStore();
-
   const [form, setForm] = useState({ name: '', phone: '', email: '' });
 
-  const load = async () => {
-    setIsLoading(true);
-    try { 
-      const data = await getPosCustomers();
-      setCustomers(data);
-    } catch (err) {
-      console.error('Failed to load customers:', err);
-      addToast('System error loading database.', 'error');
-    } finally { 
-      setIsLoading(false); 
-    }
-  };
-
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: customers, isLoading, connectionStatus, refetch } = useRealtimeTable<Customer>({
+    table: 'customer',
+    initialData: [],
+    fetcher: getPosCustomers,
+    // customer data has a type discriminator added client-side; refetch on change is safer
+    refetchOnChange: true,
+  });
 
   const processed = useMemo(() => {
     const filtered = customers.filter(c =>
@@ -88,7 +84,7 @@ export default function CustomersPage() {
     try {
       await addPosCustomer({ name: form.name, phone: form.phone || undefined, email: form.email || undefined });
       addToast('Customer added', 'success');
-      await load();
+      await refetch();
       setIsAddOpen(false);
       setForm({ name: '', phone: '', email: '' });
     } catch { addToast('Failed to add customer', 'error'); }
@@ -96,10 +92,7 @@ export default function CustomersPage() {
   };
 
   const handleEditOpen = (c: Customer) => {
-    if (c.type === 'ECOMMERCE') {
-      addToast('Storefront customer data is read-only in POS Admin', 'info');
-      return;
-    }
+    if (c.type === 'ECOMMERCE') { addToast('Storefront customer data is read-only in POS Admin', 'info'); return; }
     setEditingCustomer(c);
     setForm({ name: c.name, phone: c.phone || '', email: c.email || '' });
     setIsEditOpen(true);
@@ -112,22 +105,19 @@ export default function CustomersPage() {
     try {
       await updatePosCustomer(editingCustomer.id, { name: form.name, phone: form.phone || undefined, email: form.email || undefined });
       addToast('Customer updated', 'success');
-      await load();
+      await refetch();
       setIsEditOpen(false);
     } catch { addToast('Failed to update', 'error'); }
     finally { setIsSaving(false); }
   };
 
   const handleDelete = async (c: Customer) => {
-    if (c.type === 'ECOMMERCE') {
-      addToast('Cannot delete storefront customers from here.', 'error');
-      return;
-    }
+    if (c.type === 'ECOMMERCE') { addToast('Cannot delete storefront customers from here.', 'error'); return; }
     if (!window.confirm('Delete this customer?')) return;
     try {
       await deletePosCustomer(c.id);
       addToast('Customer deleted', 'info');
-      await load();
+      await refetch();
     } catch { addToast('Failed to delete', 'error'); }
   };
 
@@ -141,9 +131,12 @@ export default function CustomersPage() {
           </h1>
           <p className="text-sm text-muted-foreground font-medium">Manage POS and Storefront customers in one view</p>
         </div>
-        <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> New POS Customer
-        </Button>
+        <div className="flex items-center gap-3">
+          <ConnBadge status={connectionStatus} />
+          <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
+            <Plus className="h-4 w-4" /> New POS Customer
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

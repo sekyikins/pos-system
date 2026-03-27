@@ -423,7 +423,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                   : 'h-13 text-base'
               }`}
              size={variant === 'pos' ? 'lg' : undefined}
-             disabled={cart.items.length === 0}
+             disabled={cart.items.length === 0 || (variant === 'pos' && !selectedCustomerId)}
              onClick={handleCheckoutClick}
            >
              {variant === 'storefront' ? 'Proceed to Checkout' : `Charge $${finalTotal.toFixed(2)}`}
@@ -445,6 +445,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
           discount={discountAmount}
           finalTotal={finalTotal}
           customerId={selectedCustomerId || undefined}
+          customerType={selectedCustomer?.type}
           onComplete={(saleId) => {
             setIsPaymentOpen(false);
             setLastSaleId(saleId);

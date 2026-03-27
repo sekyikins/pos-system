@@ -1,36 +1,100 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Sale, Product } from '@/lib/types';
 import { getSales, getProducts } from '@/lib/db';
-import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp } from 'lucide-react';
+import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp, Wifi, WifiOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 
-interface ProductStat {
-  name: string;
-  category: string;
-  unitsSold: number;
-  revenue: number;
-}
+interface ProductStat { name: string; category: string; unitsSold: number; revenue: number; }
+interface DailyStat { date: string; sales: number; revenue: number; }
 
-interface DailyStat {
-  date: string;
-  sales: number;
-  revenue: number;
+function ConnBadge({ status }: { status: ConnectionStatus }) {
+  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
 }
 
 export default function ReportsPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const { data: sales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
+    table: 'sales',
+    initialData: [],
+    fetcher: getSales,
+  });
 
-  useEffect(() => {
-    Promise.all([getSales(), getProducts()])
-      .then(([s, p]) => { setSales(s); setProducts(p); })
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { data: products, isLoading: loadingProducts, connectionStatus: productsStatus } = useRealtimeTable<Product>({
+    table: 'products',
+    initialData: [],
+    fetcher: getProducts,
+  });
+
+  const isLoading = loadingSales || loadingProducts;
+  const connectionStatus: ConnectionStatus =
+    salesStatus === 'connected' && productsStatus === 'connected' ? 'connected' :
+    salesStatus === 'error' || productsStatus === 'error' ? 'error' : 'connecting';
+
+  // ─── Compute stats (memoized) ────────────────────────────────────
+  const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.finalAmount, 0), [sales]);
+  const totalDiscount = useMemo(() => sales.reduce((s, sale) => s + sale.discount, 0), [sales]);
+  const avgOrderValue = useMemo(() => sales.length > 0 ? totalRevenue / sales.length : 0, [sales, totalRevenue]);
+
+  const paymentBreakdown = useMemo(() => {
+    const breakdown: Record<string, { count: number; total: number }> = {};
+    sales.forEach(sale => {
+      if (!breakdown[sale.paymentMethod]) breakdown[sale.paymentMethod] = { count: 0, total: 0 };
+      breakdown[sale.paymentMethod].count++;
+      breakdown[sale.paymentMethod].total += sale.finalAmount;
+    });
+    return breakdown;
+  }, [sales]);
+
+  const productStats = useMemo(() => {
+    const map: Record<string, ProductStat> = {};
+    sales.forEach(sale => {
+      sale.items.forEach(item => {
+        if (!map[item.productId]) {
+          const p = products.find(prod => prod.id === item.productId);
+          map[item.productId] = { name: item.productName, category: p?.category ?? '—', unitsSold: 0, revenue: 0 };
+        }
+        map[item.productId].unitsSold += item.quantity;
+        map[item.productId].revenue += item.subtotal;
+      });
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  }, [sales, products]);
+
+  const { dailyStats, maxRevenue } = useMemo(() => {
+    const dailyMap: Record<string, DailyStat> = {};
+    const today = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      dailyMap[key] = { date: key, sales: 0, revenue: 0 };
+    }
+    sales.forEach(sale => {
+      const key = sale.timestamp.split('T')[0];
+      if (dailyMap[key]) { dailyMap[key].sales++; dailyMap[key].revenue += sale.finalAmount; }
+    });
+    const stats = Object.values(dailyMap);
+    return { dailyStats: stats, maxRevenue: Math.max(...stats.map(d => d.revenue), 1) };
+  }, [sales]);
+
+  const { categoryStats, maxCat } = useMemo(() => {
+    const categoryMap: Record<string, number> = {};
+    sales.forEach(sale => {
+      sale.items.forEach(item => {
+        const p = products.find(prod => prod.id === item.productId);
+        const cat = p?.category ?? 'Other';
+        categoryMap[cat] = (categoryMap[cat] ?? 0) + item.subtotal;
+      });
+    });
+    const stats = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
+    return { categoryStats: stats, maxCat: Math.max(...stats.map(c => c[1]), 1) };
+  }, [sales, products]);
 
   if (isLoading) return (
     <div className="space-y-6">
@@ -41,85 +105,24 @@ export default function ReportsPage() {
         ))}
       </div>
       <Card className="h-64">
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
+        <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
         <CardContent className="flex items-end gap-2 px-6 h-40 pb-6">
           {[60, 45, 80, 55, 90, 40, 70, 85, 50, 65, 75, 55, 45, 95].map((h, i) => (
             <div key={i} className="flex-1 bg-muted animate-pulse rounded-t-sm" style={{ height: `${h}%` }} />
           ))}
         </CardContent>
       </Card>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent className="space-y-4">{[...Array(5)].map((_, i) => <div key={i} className="flex justify-between"><Skeleton className="h-10 flex-1 mr-4" /><Skeleton className="h-6 w-16" /></div>)}</CardContent></Card>
-        <Card><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent className="space-y-4">{[...Array(3)].map((_, i) => <div key={i} className="space-y-2"><Skeleton className="h-4 w-1/4" /><Skeleton className="h-2 w-full" /></div>)}</CardContent></Card>
-      </div>
     </div>
   );
 
-  // ─── Compute stats ────────────────────────────────
-  const totalRevenue = sales.reduce((s, sale) => s + sale.finalAmount, 0);
-  const totalDiscount = sales.reduce((s, sale) => s + sale.discount, 0);
-  const avgOrderValue = sales.length > 0 ? totalRevenue / sales.length : 0;
-
-  // Payment method breakdown
-  const paymentBreakdown: Record<string, { count: number; total: number }> = {};
-  sales.forEach(sale => {
-    if (!paymentBreakdown[sale.paymentMethod]) paymentBreakdown[sale.paymentMethod] = { count: 0, total: 0 };
-    paymentBreakdown[sale.paymentMethod].count++;
-    paymentBreakdown[sale.paymentMethod].total += sale.finalAmount;
-  });
-
-  // Product performance
-  const productStatsMap: Record<string, ProductStat> = {};
-  sales.forEach(sale => {
-    sale.items.forEach(item => {
-      if (!productStatsMap[item.productId]) {
-        const p = products.find(prod => prod.id === item.productId);
-        productStatsMap[item.productId] = { name: item.productName, category: p?.category ?? '—', unitsSold: 0, revenue: 0 };
-      }
-      productStatsMap[item.productId].unitsSold += item.quantity;
-      productStatsMap[item.productId].revenue += item.subtotal;
-    });
-  });
-  const productStats = Object.values(productStatsMap).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-
-  // Daily sales (last 14 days)
-  const dailyMap: Record<string, DailyStat> = {};
-  const today = new Date();
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split('T')[0];
-    dailyMap[key] = { date: key, sales: 0, revenue: 0 };
-  }
-  sales.forEach(sale => {
-    const key = sale.timestamp.split('T')[0];
-    if (dailyMap[key]) {
-      dailyMap[key].sales++;
-      dailyMap[key].revenue += sale.finalAmount;
-    }
-  });
-  const dailyStats = Object.values(dailyMap);
-  const maxRevenue = Math.max(...dailyStats.map(d => d.revenue), 1);
-
-  // Category breakdown
-  const categoryMap: Record<string, number> = {};
-  sales.forEach(sale => {
-    sale.items.forEach(item => {
-      const p = products.find(prod => prod.id === item.productId);
-      const cat = p?.category ?? 'Other';
-      categoryMap[cat] = (categoryMap[cat] ?? 0) + item.subtotal;
-    });
-  });
-  const categoryStats = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
-  const maxCat = Math.max(...categoryStats.map(c => c[1]), 1);
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports & Analytics</h1>
-        <p className="text-sm text-muted-foreground">Business performance overview and insights</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Reports &amp; Analytics</h1>
+          <p className="text-sm text-muted-foreground">Business performance overview — updates in real time</p>
+        </div>
+        <ConnBadge status={connectionStatus} />
       </div>
 
       {/* KPI Cards */}
@@ -169,9 +172,7 @@ export default function ReportsPage() {
 
         {/* Top Products */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Top Products by Revenue</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Top Products by Revenue</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3">
               {productStats.map((p, i) => (
@@ -194,9 +195,7 @@ export default function ReportsPage() {
         {/* Category & Payment Breakdown */}
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Revenue by Category</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Revenue by Category</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {categoryStats.map(([cat, rev]) => (
@@ -213,11 +212,8 @@ export default function ReportsPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle>Payment Method Breakdown</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Payment Method Breakdown</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {Object.entries(paymentBreakdown).map(([method, stat]) => (
