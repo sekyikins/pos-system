@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,10 +12,9 @@ import { getProducts, getInventoryLogs, adjustInventory } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
 import { Search, History, ArrowUpCircle, ArrowDownCircle, AlertCircle, Plus, Loader2 } from 'lucide-react';
 
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [logs, setLogs] = useState<InventoryLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
@@ -23,16 +22,21 @@ export default function InventoryPage() {
   const [isSaving, setIsSaving] = useState(false);
   const { addToast } = useToastStore();
 
-  const load = async () => {
-    setIsLoading(true);
-    try {
-      const [p, l] = await Promise.all([getProducts(), getInventoryLogs()]);
-      setProducts(p);
-      setLogs(l);
-    } finally { setIsLoading(false); }
-  };
+  const { data: products, isLoading: productsLoading, refetch: refetchProducts } = useRealtimeTable<Product>({
+    table: 'products',
+    initialData: [],
+    fetcher: getProducts,
+    refetchOnChange: true
+  });
 
-  useEffect(() => { load(); }, []);
+  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useRealtimeTable<InventoryLog>({
+    table: 'inventory',
+    initialData: [],
+    fetcher: getInventoryLogs,
+    refetchOnChange: true
+  });
+
+  const isLoading = productsLoading || logsLoading;
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode.includes(searchQuery)
@@ -49,7 +53,8 @@ export default function InventoryPage() {
       addToast(`Stock adjusted by ${amount > 0 ? '+' : ''}${amount}`, 'success');
       setAdjustingProduct(null);
       setAdjustAmount('');
-      await load();
+      refetchProducts();
+      refetchLogs();
     } catch (err: unknown) {
       addToast(err instanceof Error ? err.message : 'Failed to adjust', 'error');
     } finally { setIsSaving(false); }

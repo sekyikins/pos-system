@@ -7,7 +7,7 @@ export const Card = ({ className = '', children, ...props }: React.HTMLAttribute
 );
 
 export const CardHeader = ({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`flex flex-col space-y-1.5 p-6 ${className}`} {...props} />
+  <div className={`flex flex-col space-y-1.5 p-5 border-b border-border ${className}`} {...props} />
 );
 
 export const CardTitle = ({ className = '', ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
@@ -15,7 +15,7 @@ export const CardTitle = ({ className = '', ...props }: React.HTMLAttributes<HTM
 );
 
 export const CardContent = ({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`p-6 pt-0 ${className}`} {...props} />
+  <div className={`p-5 pt-2.5 ${className}`} {...props} />
 );
 
 export const CardDescription = ({ className = '', ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (

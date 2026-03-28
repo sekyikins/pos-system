@@ -9,9 +9,9 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 
 function ConnectionDot({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected')    return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+  if (status === 'connected')    return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
 }
 
 export default function AdminDashboard() {
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -126,9 +126,9 @@ export default function AdminDashboard() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Recent Sales */}
-        <Card>
+        <Card className='max-h-[460px] overflow-y-hidden'>
           <CardHeader><CardTitle>Recent Sales</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className='max-h-[400px] overflow-y-auto'>
             {recentSales.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No sales recorded yet.</p>
             ) : (
@@ -150,13 +150,13 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Low Stock */}
-        <Card>
+        <Card className='max-h-[460px] overflow-y-hidden'>
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" /> Low Stock Items
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className='max-h-[400px] overflow-y-auto'>
             {lowStockProducts.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">All products are well stocked.</p>
             ) : (

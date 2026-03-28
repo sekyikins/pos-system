@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,6 +13,7 @@ import { useToastStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Plus, Search, Edit, Trash2, Loader2, ShieldCheck, ShieldAlert, ArrowUpDown, Calendar, UserCheck } from 'lucide-react';
 import bcrypt from 'bcryptjs';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 
 const ROLE_BADGE = {
   ADMIN: { label: 'Admin', class: 'bg-destructive/10 text-destructive' },
@@ -24,8 +25,6 @@ const ROLE_BADGE = {
 type SortKey = 'name' | 'date';
 
 export default function StaffPage() {
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -40,19 +39,12 @@ export default function StaffPage() {
   const [addForm, setAddForm] = useState({ name: '', username: '', password: '', role: 'CASHIER' });
   const [editForm, setEditForm] = useState({ name: '', role: 'CASHIER', password: '' });
 
-  const load = async () => {
-    setIsLoading(true);
-    try { 
-      setUsers(await getUsers()); 
-    } catch (err) {
-      console.error('Failed to load users:', err);
-      addToast('System error: Database issue.', 'error');
-    } finally { 
-      setIsLoading(false); 
-    }
-  };
-
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: users, isLoading, refetch } = useRealtimeTable<UserRecord>({
+    table: 'pos_staff',
+    initialData: [],
+    fetcher: getUsers,
+    refetchOnChange: true
+  });
 
   const processed = useMemo(() => {
     const filtered = users.filter(u => {
@@ -104,7 +96,7 @@ export default function StaffPage() {
         role: addForm.role as UserRecord['role']
       });
       addToast('User created successfully', 'success');
-      await load();
+      refetch();
       setIsAddOpen(false);
       setAddForm({ name: '', username: '', password: '', role: 'CASHIER' });
     } catch { addToast('Failed to create user', 'error'); }
@@ -124,7 +116,7 @@ export default function StaffPage() {
     try {
       await updateUser(editingUser.id, { name: editForm.name, role: editForm.role, password: editForm.password || undefined });
       addToast('User updated', 'success');
-      await load();
+      refetch();
       setIsEditOpen(false);
     } catch { addToast('Failed to update', 'error'); }
     finally { setIsSaving(false); }
@@ -136,7 +128,7 @@ export default function StaffPage() {
     try {
       await deleteUser(u.id);
       addToast('User deleted', 'info');
-      await load();
+      refetch();
     } catch { addToast('Failed to delete user', 'error'); }
   };
 
@@ -144,7 +136,7 @@ export default function StaffPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black flex items-center gap-2">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
             <UserCheck className="h-8 w-8 text-primary" />
             Staff Management
           </h1>
@@ -198,7 +190,7 @@ export default function StaffPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left align-middle">
-                <thead className="bg-muted/30 text-[10px] uppercase font-black text-muted-foreground/70 border-b border-border/50">
+                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
                   <tr>
                     <th className="px-6 py-4">Employee</th>
                     <th className="px-6 py-4">Account Access</th>
@@ -217,18 +209,18 @@ export default function StaffPage() {
                       <tr key={u.id} className="hover:bg-primary/5 transition-all group">
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-sm shrink-0 shadow-sm border border-primary/10">
+                            <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0 shadow-sm border border-primary/10">
                               {u.name.charAt(0)}
                             </div>
                             <div>
-                               <p className="font-black text-foreground text-base tracking-tight">{u.name}</p>
-                               {isSelf && <Badge className="bg-success text-white text-[10px] h-4 font-black mt-0.5">YOU</Badge>}
+                               <p className="font-bold text-foreground text-base tracking-tight">{u.name}</p>
+                               {isSelf && <Badge className="bg-success text-white text-[10px] h-4 font-bold mt-0.5">YOU</Badge>}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-5 font-mono text-xs text-muted-foreground font-bold">@{u.username}</td>
                         <td className="px-6 py-5">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black tracking-wide ${roleBadge.class} border border-current/10 shadow-sm`}>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold tracking-wide ${roleBadge.class} border border-current/10 shadow-sm`}>
                             {u.role === 'ADMIN' ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
                             {roleBadge.label}
                           </span>

@@ -87,13 +87,13 @@ export default function StoreSettingsPage() {
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             <Settings className="h-8 w-8 text-primary" />
             Store Configuration
           </h1>
           <p className="text-sm text-muted-foreground font-medium">Global settings for your POS and e-commerce platforms</p>
         </div>
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border border-border/50">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border border-border/50">
           Last updated: {settings ? new Date(settings.updatedAt).toLocaleDateString() : 'Never'}
         </div>
       </div>
@@ -104,12 +104,12 @@ export default function StoreSettingsPage() {
           <div className="lg:col-span-2 space-y-8">
             <Card className="border-2 border-border/50 shadow-sm overflow-hidden">
               <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
-                <div className="flex items-center gap-3 text-lg font-black uppercase tracking-wide">
+                <div className="flex items-center gap-3 text-lg font-bold uppercase tracking-wide">
                   <Store className="h-5 w-5 text-primary" />
                   General Information
                 </div>
               </CardHeader>
-              <CardContent className="pt-8 space-y-6">
+              <CardContent className="pt-5 space-y-6">
                 <Input 
                   label="Store Identity Name" 
                   value={form.storeName} 
@@ -159,12 +159,12 @@ export default function StoreSettingsPage() {
             {/* Receipt Styling */}
             <Card className="border-2 border-border/50 shadow-sm overflow-hidden">
                <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
-                  <div className="flex items-center gap-3 text-lg font-black uppercase tracking-wide">
+                  <div className="flex items-center gap-3 text-lg font-bold uppercase tracking-wide">
                     <FileText className="h-5 w-5 text-primary" />
                     Receipt Content
                   </div>
                </CardHeader>
-               <CardContent className="pt-8 space-y-6">
+               <CardContent className="pt-5 space-y-6">
                  <div className="space-y-2">
                     <label className="text-sm font-bold text-muted-foreground">Receipt Header Message</label>
                     <textarea 
@@ -191,25 +191,25 @@ export default function StoreSettingsPage() {
           <div className="space-y-6">
             <Card className="border-2 border-primary/20 bg-primary/5 shadow-none overflow-hidden sticky top-8">
                <CardHeader className="bg-primary/10 border-b border-primary/10">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4" /> Live Preview
                   </h3>
                </CardHeader>
                <CardContent className="p-6">
                   <div className="bg-card border-l-4 border-primary rounded-xl p-6 shadow-xl space-y-4">
                      <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Current Store:</p>
-                        <p className="text-xl font-black text-foreground line-clamp-1">{form.storeName || 'My Store'}</p>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Current Store:</p>
+                        <p className="text-xl font-bold text-foreground line-clamp-1">{form.storeName || 'My Store'}</p>
                      </div>
                      <div className="h-px bg-border/40" />
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-0.5">
-                           <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Currency:</p>
-                           <p className="text-lg font-black text-primary">{POPULAR_CURRENCIES.find(c => c.code === form.currency)?.symbol} ({form.currency})</p>
+                           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Currency:</p>
+                           <p className="text-lg font-bold text-primary">{POPULAR_CURRENCIES.find(c => c.code === form.currency)?.symbol} ({form.currency})</p>
                         </div>
                         <div className="space-y-0.5">
-                           <p className="text-[10px] text-muted-foreground font-black uppercase tracking-tighter">Taxation:</p>
-                           <p className="text-lg font-black text-foreground">{form.taxRate}%</p>
+                           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Taxation:</p>
+                           <p className="text-lg font-bold text-foreground">{form.taxRate}%</p>
                         </div>
                      </div>
                   </div>
@@ -219,7 +219,7 @@ export default function StoreSettingsPage() {
                       fullWidth 
                       type="submit" 
                       disabled={isSaving}
-                      className="font-black text-lg gap-2 rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      className="font-bold text-lg gap-2 rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                     >
                       {isSaving ? (
                         <>

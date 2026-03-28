@@ -17,6 +17,7 @@ interface PaymentModalProps {
   finalTotal: number;
   customerId?: string;
   customerType?: 'POS' | 'ECOMMERCE';
+  promoCode?: string;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -26,7 +27,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   discount,
   finalTotal,
   customerId,
-  customerType,
+  promoCode,
 }) => {
   const cart = useCartStore();
   const { addToast } = useToastStore();
@@ -49,12 +50,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       const sale = await processSale({
         cashierId: user?.id || 'unknown',
         customerId,
-        customerType,
         items: cart.items.map(item => ({ ...item })),
         totalAmount: cart.getTotal(),
         discount,
         finalAmount: finalTotal,
         paymentMethod: method,
+        promoCode,
       });
 
       addToast('Payment successful! 🎉', 'success');
@@ -104,7 +105,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           )}
           <div className="flex justify-between items-baseline">
             <span className="text-muted-foreground text-base">Total Due</span>
-            <span className="font-black text-3xl">{currencySymbol}{finalTotal.toFixed(2)}</span>
+            <span className="font-bold text-3xl">{currencySymbol}{finalTotal.toFixed(2)}</span>
           </div>
 
         </div>

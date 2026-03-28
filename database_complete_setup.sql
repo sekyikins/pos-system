@@ -270,6 +270,15 @@ CREATE TABLE public.store_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
+-- 6.6 Product-Supplier Links
+CREATE TABLE public.product_suppliers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    supplier_id UUID NOT NULL REFERENCES public.suppliers(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    UNIQUE(product_id, supplier_id)
+);
+
 -- ==========================================
 -- 7. HELPERS, TRIGGERS & INDEXES
 -- ==========================================
@@ -334,6 +343,7 @@ ALTER TABLE public.purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_suppliers ENABLE ROW LEVEL SECURITY;
 
 -- Note: In this application, web clients connect via 'anon' and use direct access.
 -- Real-world applications should restrict this!
@@ -359,6 +369,7 @@ CREATE POLICY "Allow all to public" ON public.purchase_orders FOR ALL USING (tru
 CREATE POLICY "Allow all to public" ON public.purchase_order_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.expenses FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.store_settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all to public" ON public.product_suppliers FOR ALL USING (true) WITH CHECK (true);
 
 -- ==========================================
 -- 9. SUPABASE REALTIME
@@ -376,7 +387,8 @@ DECLARE
     'e_customer',
     'e_cart',
     'online_order_items',
-    'sales_items'
+    'sales_items',
+    'product_suppliers'
   ];
   t TEXT;
 BEGIN

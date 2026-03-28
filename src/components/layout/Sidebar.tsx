@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { ShoppingBag, Package, Users, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, UserCog, AlertTriangle, Truck, Settings } from 'lucide-react';
+import { ShoppingBag, Package, Users, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, UserCog, AlertTriangle, Truck, Settings, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
@@ -24,6 +24,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       { name: 'Online Orders', href: '/admin/online-orders', icon: ShoppingBag, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
       { name: 'Products', href: '/admin/products', icon: Package, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Categories', href: '/admin/categories', icon: Archive, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Promotions', href: '/admin/promotions', icon: Ticket, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Inventory', href: '/admin/inventory', icon: Package, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Customers', href: '/admin/customers', icon: Users, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Reports', href: '/admin/reports', icon: PieChart, roles: ['ADMIN', 'MANAGER'] },

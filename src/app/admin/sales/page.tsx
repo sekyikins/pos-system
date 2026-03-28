@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -11,21 +11,22 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useSettingsStore } from '@/lib/store';
 
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+
 const METHOD_ICON = { CASH: Banknote, CARD: CreditCard, MOBILE_MONEY: Smartphone };
 const METHOD_COLOR = { CASH: 'text-success', CARD: 'text-info', MOBILE_MONEY: 'text-warning' };
 
 export default function SalesPage() {
   const { currencySymbol } = useSettingsStore();
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
-  useEffect(() => {
-    getSales()
-      .then(setSales)
-      .finally(() => setIsLoading(false));
-  }, []);
+  const { data: sales, isLoading } = useRealtimeTable<Sale>({
+    table: 'sales',
+    initialData: [],
+    fetcher: getSales,
+    refetchOnChange: true
+  });
 
   const filtered = sales.filter(s =>
     s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -44,9 +45,14 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Sales Transactions</h1>
-        <p className="text-sm text-muted-foreground">All recorded point-of-sale transactions</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
+            <ShoppingBag className="h-8 w-8 text-primary" />
+            Sales Transactions
+          </h1>
+          <p className="text-sm text-muted-foreground font-medium">All recorded point-of-sale transactions</p>
+        </div>
       </div>
 
       {/* Summary */}
@@ -60,74 +66,90 @@ export default function SalesPage() {
           <Card key={item.label}>
             <CardContent className="pt-5">
               <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
+              <p className="text-xs font-bold text-muted-foreground mt-1">{item.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
+      <Card className="border-2 border-border/50 overflow-hidden">
+        <CardHeader className="pb-0 border-b border-border/50">
+          <div className="flex items-center gap-2 pb-6">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
-              <Input placeholder="Search by ID, method, cashier..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
+              <Input 
+                placeholder="Search by ID, method, cashier..." 
+                className="pl-10 h-11 rounded-xl border-border bg-muted/20" 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+              />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="space-y-1">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 px-6 py-4 border-b border-border last:border-0 bg-muted/5 animate-pulse">
+            <div className="space-y-0.5">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="flex items-center gap-6 px-6 py-5 border-b border-border last:border-0 bg-muted/5 animate-pulse">
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-4 w-12" />
-                  <Skeleton className="h-5 w-24 rounded-lg" />
-                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-6 w-24 rounded-lg" />
                   <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-8 rounded-md ml-auto" />
+                  <Skeleton className="h-8 w-8 rounded-xl ml-auto" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-border overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/90 text-xs uppercase font-semibold text-muted-foreground border-b border-border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left align-middle font-medium">
+                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
                   <tr>
-                    <th className="px-6 py-3">Receipt ID</th>
-                    <th className="px-6 py-3">Date & Time</th>
-                    <th className="px-6 py-3">Items</th>
-                    <th className="px-6 py-3">Payment</th>
-                    <th className="px-6 py-3">Discount</th>
-                    <th className="px-6 py-3">Total</th>
-                    <th className="px-6 py-3 text-right">View</th>
+                    <th className="px-6 py-4">Receipt ID</th>
+                    <th className="px-6 py-4">Timestamp</th>
+                    <th className="px-6 py-4">Items</th>
+                    <th className="px-6 py-4">Method</th>
+                    <th className="px-6 py-4">Adjustment</th>
+                    <th className="px-6 py-4">Total</th>
+                    <th className="px-6 py-4 text-right">View</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/40">
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No transactions found.</td></tr>
+                    <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground font-medium italic">No transactions detected.</td></tr>
                   ) : filtered.map(sale => {
                     const Icon = METHOD_ICON[sale.paymentMethod] ?? ShoppingBag;
                     const color = METHOD_COLOR[sale.paymentMethod] ?? '';
                     return (
-                      <tr key={sale.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs">#{sale.id.slice(-8)}</td>
-                        <td className="px-6 py-4 text-muted-foreground">{new Date(sale.timestamp).toLocaleString()}</td>
-                        <td className="px-6 py-4">{sale.items.length}</td>
-                        <td className="px-6 py-4">
-                          <div className={`flex items-center gap-1.5 font-medium ${color}`}>
-                            <Icon className="h-4 w-4" />
+                      <tr key={sale.id} className="hover:bg-primary/5 transition-all group">
+                        <td className="p-5">
+                           <span className="font-mono text-[14px] font-bold bg-muted/50 px-2 py-0.5 rounded tracking-tighter">
+                             #{sale.id.slice(-8).toUpperCase()}
+                           </span>
+                        </td>
+                        <td className="p-5 text-muted-foreground/80 font-bold text-xs">{new Date(sale.timestamp).toLocaleString()}</td>
+                        <td className="p-5">
+                          <div className="flex justify-center">{sale.items.length}</div>
+                        </td>
+                        <td className="p-5">
+                          <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-tight ${color}`}>
+                            <Icon className="h-3.5 w-3.5" />
                             {sale.paymentMethod.replace('_', ' ')}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          {sale.discount > 0 ? <span className="text-success">-{currencySymbol}{sale.discount.toFixed(2)}</span> : <span className="text-muted-foreground/40">—</span>}
+                        <td className="p-5">
+                          {sale.discount > 0 ? (
+                            <span className="text-success font-bold text-xs">-{currencySymbol}{sale.discount.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-muted-foreground/60 font-medium italic text-[10px]">No discount</span>
+                          )}
                         </td>
-                        <td className="px-6 py-4 font-bold">{currencySymbol}{sale.finalAmount.toFixed(2)}</td>
-                        <td className="px-6 py-4 text-right">
-                          <Button variant="ghost" size="md" className="h-8 w-8 p-0" onClick={() => handleView(sale)}>
-                            <Eye className="h-4 w-4 text-primary" />
+                        <td className="p-5 font-bold text-base text-foreground">
+                          {currencySymbol}{sale.finalAmount.toFixed(2)}
+                        </td>
+                        <td className="p-5 text-right">
+                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-primary hover:bg-primary/10" onClick={() => handleView(sale)}>
+                            <Eye className="h-5 w-5" />
                           </Button>
                         </td>
                       </tr>

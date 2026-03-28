@@ -14,9 +14,9 @@ interface ProductStat { name: string; category: string; unitsSold: number; reven
 interface DailyStat { date: string; sales: number; revenue: number; }
 
 function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
 }
 
 export default function ReportsPage() {
@@ -26,12 +26,14 @@ export default function ReportsPage() {
     table: 'sales',
     initialData: [],
     fetcher: getSales,
+    refetchOnChange: true
   });
 
   const { data: products, isLoading: loadingProducts, connectionStatus: productsStatus } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
+    refetchOnChange: true
   });
 
   const isLoading = loadingSales || loadingProducts;
@@ -107,9 +109,9 @@ export default function ReportsPage() {
           <Card key={i}><CardContent className="pt-5 flex flex-col items-center"><Skeleton className="h-10 w-10 rounded-lg mb-3" /><Skeleton className="h-6 w-24 mb-2" /><Skeleton className="h-3 w-16" /></CardContent></Card>
         ))}
       </div>
-      <Card className="h-64">
+      <Card className="h-[400px]">
         <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-        <CardContent className="flex items-end gap-2 px-6 h-40 pb-6">
+        <CardContent className="flex items-end gap-2 px-6 h-[300px] pb-6">
           {[60, 45, 80, 55, 90, 40, 70, 85, 50, 65, 75, 55, 45, 95].map((h, i) => (
             <div key={i} className="flex-1 bg-muted animate-pulse rounded-t-sm" style={{ height: `${h}%` }} />
           ))}
@@ -152,17 +154,17 @@ export default function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5" />Daily Revenue — Last 14 Days</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-1.5 h-40">
+          <CardContent className="pb-10 overflow-y-auto">
+            <div className="flex items-end gap-1.5 h-[300px]">
               {dailyStats.map(d => (
                 <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
                   <div className="relative w-full flex justify-center">
                     <div title={`${currencySymbol}${d.revenue.toFixed(2)}`}
-                      style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 120)}px` }}
+                      style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 240)}px` }}
                       className="w-full bg-primary/70 hover:bg-primary rounded-t-sm transition-all"
                     />
                   </div>
-                  <span className="text-[9px] text-muted-foreground rotate-45 origin-left mt-1">
+                  <span className="text-[9px] text-muted-foreground rotate-45 origin-left mt-1 whitespace-nowrap">
                     {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                   </span>
                 </div>
@@ -171,9 +173,9 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='max-h-[850px] overflow-y-hidden'>
           <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Top Products by Revenue</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className='max-h-[780px] overflow-y-auto'>
             <div className="space-y-3">
               {productStats.map((p, i) => (
                 <div key={p.name} className="flex items-center justify-between gap-2">
@@ -193,9 +195,9 @@ export default function ReportsPage() {
         </Card>
 
         <div className="space-y-6">
-          <Card>
+          <Card className='max-h-[600px] overflow-y-hidden'>
             <CardHeader><CardTitle>Revenue by Category</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className='max-h-[520px] overflow-y-auto'>
               <div className="space-y-3">
                 {categoryStats.map(([cat, rev]) => (
                   <div key={cat}>

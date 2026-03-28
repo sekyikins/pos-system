@@ -181,3 +181,73 @@ export async function updateStoreSettings(id: string, s: Partial<StoreSettings>)
   const { error } = await supabase.from('store_settings').update(row).eq('id', id);
   if (error) throw error;
 }
+
+// ─── Promotions ─────────────────────────────────────────────────────────────
+import { Promotion } from './types';
+
+export async function getPromotions(): Promise<Promotion[]> {
+  const { data, error } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    discountType: row.discount_type,
+    discountValue: Number(row.discount_value),
+    isActive: row.is_active,
+    minSubtotal: Number(row.min_subtotal || 0),
+    startDate: row.start_date,
+    endDate: row.end_date,
+    usageCount: Number(row.usage_count || 0),
+    createdAt: row.created_at
+  }));
+}
+
+export async function addPromotion(p: Omit<Promotion, 'id' | 'createdAt'>): Promise<Promotion> {
+  const { data, error } = await supabase.from('promotions').insert({
+    name: p.name,
+    code: p.code,
+    discount_type: p.discountType,
+    discount_value: p.discountValue,
+    is_active: p.isActive,
+    min_subtotal: p.minSubtotal,
+    start_date: p.startDate,
+    end_date: p.endDate,
+    usage_count: p.usageCount || 0
+  }).select().single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name,
+    code: data.code,
+    discountType: data.discount_type,
+    discountValue: Number(data.discount_value),
+    isActive: data.is_active,
+    minSubtotal: Number(data.min_subtotal || 0),
+    startDate: data.start_date,
+    endDate: data.end_date,
+    usageCount: Number(data.usage_count || 0),
+    createdAt: data.created_at
+  };
+}
+
+export async function updatePromotion(id: string, p: Partial<Promotion>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (p.name) row.name = p.name;
+  if (p.code) row.code = p.code;
+  if (p.discountType) row.discount_type = p.discountType;
+  if (p.discountValue !== undefined) row.discount_value = p.discountValue;
+  if (p.isActive !== undefined) row.is_active = p.isActive;
+  if (p.minSubtotal !== undefined) row.min_subtotal = p.minSubtotal;
+  // Support clearing dates (pass null explicitly) or setting new values
+  if ('startDate' in p) row.start_date = p.startDate ?? null;
+  if ('endDate' in p) row.end_date = p.endDate ?? null;
+
+  const { error } = await supabase.from('promotions').update(row).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deletePromotion(id: string): Promise<void> {
+  const { error } = await supabase.from('promotions').delete().eq('id', id);
+  if (error) throw error;
+}

@@ -22,17 +22,17 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: React.Ele
 
 function ConnectionBadge({ status }: { status: ConnectionStatus }) {
   if (status === 'connected') return (
-    <span className="flex items-center gap-1.5 text-[10px] font-black text-success uppercase tracking-widest">
+    <span className="flex items-center gap-1.5 text-[10px] font-bold text-success uppercase tracking-widest">
       <Wifi className="h-3.5 w-3.5" /> Live
     </span>
   );
   if (status === 'error' || status === 'disconnected') return (
-    <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive uppercase tracking-widest">
+    <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive uppercase tracking-widest">
       <WifiOff className="h-3.5 w-3.5" /> Offline
     </span>
   );
   return (
-    <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+    <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
       <span className="h-2 w-2 rounded-full bg-muted-foreground animate-pulse" /> Syncing...
     </span>
   );
@@ -176,7 +176,7 @@ export function OnlineOrdersList() {
               <button
                 key={tab}
                 onClick={() => setCurrentTab(tab)}
-                className={`flex-1 py-2 px-2 rounded-xl text-[11px] sm:text-xs lg:text-sm font-black transition-all flex items-center justify-center gap-2 whitespace-nowrap min-w-fit ${
+                className={`flex-1 py-2 px-2 rounded-xl text-[11px] sm:text-xs lg:text-sm font-bold transition-all flex items-center justify-center gap-2 whitespace-nowrap min-w-fit ${
                   currentTab === tab
                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -209,7 +209,7 @@ export function OnlineOrdersList() {
             <div className="h-24 w-24 rounded-full bg-muted/30 flex items-center justify-center mb-6 shadow-inner">
               <ShoppingBag className="h-10 w-10 text-muted-foreground/40" />
             </div>
-            <h3 className="text-2xl font-black text-foreground mb-2">No {currentTab.toLowerCase()} orders</h3>
+            <h3 className="text-2xl font-bold text-foreground mb-2">No {currentTab.toLowerCase()} orders</h3>
             <p className="text-muted-foreground mb-8 font-medium">Everything looks quiet on this front.</p>
             <Button variant="outline" onClick={refetch} className="rounded-xl px-8">Refresh Data</Button>
           </div>
@@ -218,7 +218,7 @@ export function OnlineOrdersList() {
             {Object.entries(groupedHistory).map(([group, grpOrders]) => (
               <div key={group} className="space-y-6">
                 <div className="flex items-center gap-4">
-                   <h3 className="text-xl font-black text-foreground">{group}</h3>
+                   <h3 className="text-xl font-bold text-foreground">{group}</h3>
                    <div className="h-px flex-1 bg-linear-to-r from-border to-transparent" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -275,7 +275,7 @@ function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, curr
         <div className="space-y-4 flex-1">
           <div className="bg-muted/30 rounded-2xl p-3 sm:p-4">
             <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Amount</p>
-            <p className="text-2xl sm:text-3xl font-black text-primary">{currencySymbol}{order.totalAmount.toFixed(2)}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-primary">{currencySymbol}{order.totalAmount.toFixed(2)}</p>
             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
               <Badge variant="secondary" className="text-[10px] uppercase font-bold">{order.paymentMethod.replace(/_/g, ' ')}</Badge>
             </div>
@@ -307,25 +307,25 @@ function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, curr
 
         <div className="pt-4 mt-4 border-t border-border">
           {order.status === 'PENDING' && (
-            <Button fullWidth onClick={() => onStart(order.id)} disabled={isUpdating === order.id} className="h-11 font-black">
+            <Button fullWidth onClick={() => onStart(order.id)} disabled={isUpdating === order.id} className="h-11 font-bold">
               {isUpdating === order.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />}
               Start Processing
             </Button>
           )}
           {order.status === 'CONFIRMED' && isBeingProcessedByMe && (
-            <Button fullWidth variant="info" onClick={() => onUpdate(order.id, 'CONFIRMED')} disabled={isUpdating === order.id} className="h-11 font-black">
+            <Button fullWidth variant="info" onClick={() => onUpdate(order.id, 'CONFIRMED')} disabled={isUpdating === order.id} className="h-11 font-bold">
               {isUpdating === order.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Truck className="h-4 w-4 mr-2" />}
               Mark as Shipped
             </Button>
           )}
           {order.status === 'SHIPPED' && isBeingProcessedByMe && (
-            <Button fullWidth variant="success" onClick={() => onUpdate(order.id, 'SHIPPED')} disabled={isUpdating === order.id} className="h-11 font-black">
+            <Button fullWidth variant="success" onClick={() => onUpdate(order.id, 'SHIPPED')} disabled={isUpdating === order.id} className="h-11 font-bold">
               {isUpdating === order.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
               Mark as Delivered
             </Button>
           )}
           {(order.status === 'CONFIRMED' || order.status === 'SHIPPED') && !isBeingProcessedByMe && (
-            <Button fullWidth variant="outline" disabled className="h-11 opacity-50 font-black cursor-not-allowed">
+            <Button fullWidth variant="outline" disabled className="h-11 opacity-50 font-bold cursor-not-allowed">
               Being Processed
             </Button>
           )}

@@ -50,6 +50,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       `----------------------------`,
       sale.discount > 0 ? `Discount:         -${currencySymbol}${sale.discount.toFixed(2)}` : '',
       `TOTAL:             ${currencySymbol}${sale.finalAmount.toFixed(2)}`,
+      ...(sale.promoCode ? [`Promo Code:       ${sale.promoCode}`] : []),
       `PAYMENT: ${sale.paymentMethod}`,
       `============================`,
       receiptFooter ? `${receiptFooter}` : `       Thank you!`,
@@ -109,6 +110,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       doc.setFont(undefined!, 'bold');
       row('TOTAL:', `${currencySymbol}${sale.finalAmount.toFixed(2)}`, 11);
       doc.setFont(undefined!, 'normal');
+      if (sale.promoCode) row('Promo Code:', sale.promoCode, 8);
       row('Payment:', sale.paymentMethod, 8);
       y += 3;
       line();
@@ -159,7 +161,18 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
         <div className="border-t border-dashed border-border pt-3 space-y-1">
           {sale.discount > 0 && (
-            <div className="flex justify-between text-success"><span>Discount</span><span>-{currencySymbol}{sale.discount.toFixed(2)}</span></div>
+            <div className="space-y-0.5">
+              <div className="flex justify-between text-success">
+                <span>Discount</span>
+                <span>-{currencySymbol}{sale.discount.toFixed(2)}</span>
+              </div>
+              {sale.promoCode && (
+                <div className="flex justify-between text-[8px] text-success/70 font-bold uppercase tracking-tighter">
+                  <span>Promo Applied:</span>
+                  <span>{sale.promoCode}</span>
+                </div>
+              )}
+            </div>
           )}
           <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>{currencySymbol}{sale.finalAmount.toFixed(2)}</span></div>
           <div className="flex justify-between text-muted-foreground text-[10px]"><span>Method</span><span>{sale.paymentMethod}</span></div>

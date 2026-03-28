@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Customer } from '@/lib/types';
-import { getPosCustomers, addPosCustomer, updatePosCustomer, deletePosCustomer } from '@/lib/db';
+import { getAllCustomers, addPosCustomer, updatePosCustomer, deletePosCustomer } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store, Wifi, WifiOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -16,9 +16,9 @@ import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 type SortKey = 'name' | 'date' | 'loyalty';
 
 function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
 }
 
 export default function CustomersPage() {
@@ -35,8 +35,7 @@ export default function CustomersPage() {
   const { data: customers, isLoading, connectionStatus, refetch } = useRealtimeTable<Customer>({
     table: 'customer',
     initialData: [],
-    fetcher: getPosCustomers,
-    // customer data has a type discriminator added client-side; refetch on change is safer
+    fetcher: getAllCustomers,
     refetchOnChange: true,
   });
 
@@ -84,7 +83,7 @@ export default function CustomersPage() {
     try {
       await addPosCustomer({ name: form.name, phone: form.phone || undefined, email: form.email || undefined });
       addToast('Customer added', 'success');
-      await refetch();
+      refetch();
       setIsAddOpen(false);
       setForm({ name: '', phone: '', email: '' });
     } catch { addToast('Failed to add customer', 'error'); }
@@ -105,7 +104,7 @@ export default function CustomersPage() {
     try {
       await updatePosCustomer(editingCustomer.id, { name: form.name, phone: form.phone || undefined, email: form.email || undefined });
       addToast('Customer updated', 'success');
-      await refetch();
+      refetch();
       setIsEditOpen(false);
     } catch { addToast('Failed to update', 'error'); }
     finally { setIsSaving(false); }
@@ -117,7 +116,7 @@ export default function CustomersPage() {
     try {
       await deletePosCustomer(c.id);
       addToast('Customer deleted', 'info');
-      await refetch();
+      refetch();
     } catch { addToast('Failed to delete', 'error'); }
   };
 
@@ -125,11 +124,11 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <User className="h-8 w-8 text-primary" />
             Unified Customers
           </h1>
-          <p className="text-sm text-muted-foreground font-medium">Manage POS and Storefront customers in one view</p>
+          <p className="text-sm text-muted-foreground font-medium">Overview of both in-store and e-commerce shoppers</p>
         </div>
         <div className="flex items-center gap-3">
           <ConnBadge status={connectionStatus} />
@@ -148,7 +147,7 @@ export default function CustomersPage() {
                </div>
                <div>
                   <p className="text-sm font-bold text-muted-foreground">Total Database</p>
-                  <p className="text-2xl font-black">{customers.length}</p>
+                  <p className="text-2xl font-bold">{customers.length}</p>
                </div>
             </div>
           </CardContent>
@@ -161,7 +160,7 @@ export default function CustomersPage() {
                </div>
                <div>
                   <p className="text-sm font-bold text-muted-foreground">Storefront Users</p>
-                  <p className="text-2xl font-black">{customers.filter(c => c.type === 'ECOMMERCE').length}</p>
+                  <p className="text-2xl font-bold">{customers.filter(c => c.type === 'ECOMMERCE').length}</p>
                </div>
             </div>
           </CardContent>
@@ -174,7 +173,7 @@ export default function CustomersPage() {
                </div>
                <div>
                   <p className="text-sm font-bold text-muted-foreground">POS Customers</p>
-                  <p className="text-2xl font-black">{customers.filter(c => c.type === 'POS').length}</p>
+                  <p className="text-2xl font-bold">{customers.filter(c => c.type === 'POS').length}</p>
                </div>
             </div>
           </CardContent>
@@ -195,28 +194,13 @@ export default function CustomersPage() {
             </div>
             
             <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1">
-               <Button 
-                 variant={sortKey === 'name' ? 'primary' : 'ghost'} 
-                 size="sm" 
-                 onClick={() => toggleSort('name')}
-                 className="whitespace-nowrap rounded-lg"
-               >
+               <Button variant={sortKey === 'name' ? 'primary' : 'ghost'} size="sm" onClick={() => toggleSort('name')} className="whitespace-nowrap rounded-lg">
                  <ArrowUpDown className="h-3 w-3 mr-1.5" /> Name {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
                </Button>
-               <Button 
-                variant={sortKey === 'loyalty' ? 'primary' : 'ghost'} 
-                size="sm" 
-                onClick={() => toggleSort('loyalty')}
-                className="whitespace-nowrap rounded-lg"
-               >
+               <Button variant={sortKey === 'loyalty' ? 'primary' : 'ghost'} size="sm" onClick={() => toggleSort('loyalty')} className="whitespace-nowrap rounded-lg">
                  <Award className="h-3 w-3 mr-1.5" /> Loyalty {sortKey === 'loyalty' && (sortOrder === 'asc' ? '↑' : '↓')}
                </Button>
-               <Button 
-                variant={sortKey === 'date' ? 'primary' : 'ghost'} 
-                size="sm" 
-                onClick={() => toggleSort('date')}
-                className="whitespace-nowrap rounded-lg"
-               >
+               <Button variant={sortKey === 'date' ? 'primary' : 'ghost'} size="sm" onClick={() => toggleSort('date')} className="whitespace-nowrap rounded-lg">
                  <Calendar className="h-3 w-3 mr-1.5" /> Date {sortKey === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
                </Button>
             </div>
@@ -226,13 +210,12 @@ export default function CustomersPage() {
           {isLoading ? (
             <div className="space-y-0">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="flex items-center gap-6 px-6 py-5 border-b border-border last:border-0 bg-muted/5">
+                <div key={i} className="flex items-center gap-6 p-5 border-b border-border last:border-0 bg-muted/5">
                   <Skeleton className="h-10 w-10 rounded-2xl" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-4 w-1/4" />
                     <Skeleton className="h-3 w-1/3" />
                   </div>
-                  <Skeleton className="h-6 w-24 rounded-full" />
                   <Skeleton className="h-4 w-16" />
                   <div className="flex gap-2">
                     <Skeleton className="h-9 w-9 rounded-xl" />
@@ -244,9 +227,9 @@ export default function CustomersPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left align-middle">
-                <thead className="bg-muted/30 text-xs uppercase font-black text-muted-foreground/70">
+                <thead className="bg-muted/30 text-xs uppercase font-bold text-muted-foreground/70">
                   <tr>
-                    <th className="px-6 py-4">Customer Segment</th>
+                    <th className="px-6 py-4">Customer</th>
                     <th className="px-6 py-4">Contact Details</th>
                     <th className="px-6 py-4">Origin</th>
                     <th className="px-6 py-4">Status & Loyalty</th>
@@ -255,10 +238,10 @@ export default function CustomersPage() {
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {processed.length === 0 ? (
-                    <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium italic">No matches found in database.</td></tr>
+                    <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium italic">No customers found.</td></tr>
                   ) : processed.map((c: Customer) => (
                     <tr key={c.id} className="hover:bg-primary/5 transition-all group">
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                         <div className="flex items-center gap-4">
                           <div className={`h-10 w-10 rounded-2xl flex items-center justify-center font-bold shadow-sm ${
                             c.type === 'ECOMMERCE' ? 'bg-info/20 text-info' : 'bg-success/20 text-success'
@@ -266,12 +249,12 @@ export default function CustomersPage() {
                             {c.name.charAt(0)}
                           </div>
                           <div>
-                             <p className="font-black text-foreground text-base">{c.name}</p>
+                             <p className="font-bold text-foreground text-base">{c.name}</p>
                              <p className="text-[10px] text-muted-foreground font-mono">ID: {c.id.slice(0,8).toUpperCase()}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                         <div className="space-y-1.5 focus-within:ring-0">
                           {c.phone ? (
                             <div className="flex items-center gap-2 text-xs font-bold text-foreground">
@@ -285,17 +268,17 @@ export default function CustomersPage() {
                           ) : <span className="text-xs text-muted-foreground/40 italic">No email</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-5">
-                        <Badge variant="outline" className={`rounded-lg py-1 flex items-center gap-1.5 w-fit font-black ${
+                      <td className="p-5">
+                        <Badge variant="outline" className={`rounded-lg py-1 flex items-center gap-1.5 w-fit font-bold ${
                           c.type === 'ECOMMERCE' ? 'border-info/30 bg-info/5 text-info' : 'border-success/30 bg-success/5 text-success'
                         }`}>
                           {c.type === 'ECOMMERCE' ? <Monitor className="h-3 w-3" /> : <Store className="h-3 w-3" />}
                           {c.type === 'ECOMMERCE' ? 'Storefront' : 'In-Store'}
                         </Badge>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 font-black text-warning bg-warning/10 w-fit px-3 py-1 rounded-lg text-sm border border-warning/20">
+                          <div className="flex items-center gap-2 font-bold text-warning bg-warning/10 w-fit px-3 py-1 rounded-lg text-sm border border-warning/20">
                             <Award className="h-4 w-4" /> {c.loyalty_points || 0} pts
                           </div>
                           <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-bold">

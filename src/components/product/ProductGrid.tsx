@@ -55,7 +55,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, searchQuery,
             </div>
             <p className="text-[10px] md:text-xs text-muted-foreground mb-3 mt-auto uppercase tracking-wider font-semibold">{product.category}</p>
             <div className="flex items-end justify-between">
-              <span className="font-black text-lg md:text-xl">{currencySymbol}{product.price.toFixed(2)}</span>
+              <span className="font-bold text-lg md:text-xl">{currencySymbol}{product.price.toFixed(2)}</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border leading-tight ${
                 product.quantity > 10 ? 'bg-success/10 text-success border-success/20' 
                 : product.quantity > 0 ? 'bg-warning/10 text-warning border-warning/20' 

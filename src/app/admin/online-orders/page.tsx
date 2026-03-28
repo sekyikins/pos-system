@@ -22,9 +22,9 @@ const STATUS_BADGE: Record<string, { label: string; class: string }> = {
 };
 
 function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
 }
 
 export default function OnlineOrdersPage() {
@@ -120,22 +120,22 @@ export default function OnlineOrdersPage() {
                     const isPickup = !!o.deliveryPointId;
                     return (
                       <tr key={o.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs flex items-center gap-2">
+                        <td className="p-5 font-mono text-xs flex items-center gap-2">
                           <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                           {o.id.slice(-8).toUpperCase()}
                         </td>
-                        <td className="px-6 py-4 text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</td>
-                        <td className="px-6 py-4">
+                        <td className="p-5 text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</td>
+                        <td className="p-5">
                           {isPickup
                             ? <span className="text-primary font-medium">Pickup ({deliveryPoints[o.deliveryPointId!]?.name || 'Unknown'})</span>
                             : <span className="text-info font-medium">Delivery</span>
                           }
                         </td>
-                        <td className="px-6 py-4 font-bold text-success">${o.totalAmount.toFixed(2)}</td>
-                        <td className="px-6 py-4">
+                        <td className="p-5 flex justify-center font-bold text-success">${o.totalAmount.toFixed(2)}</td>
+                        <td className="p-5">
                           <Badge variant="outline" className={statusBadge.class}>{statusBadge.label}</Badge>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="p-5 text-right">
                           <Button variant="ghost" size="sm" onClick={() => { setSelectedOrder(o); setIsViewOpen(true); }}>
                             <Eye className="h-4 w-4 mr-2" /> View
                           </Button>

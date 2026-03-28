@@ -19,11 +19,14 @@ export type User = StaffRecord;
 export interface Product {
   id: string;
   name: string;
+  categoryId?: string;
   category: string;
   price: number;
   quantity: number;
   barcode: string;
   image_url?: string;
+  supplierId?: string;
+  supplierName?: string;
 }
 
 export interface Category {
@@ -85,6 +88,7 @@ export interface Sale {
   discount: number;
   finalAmount: number;
   paymentMethod: 'CASH' | 'MOBILE_MONEY' | 'CARD';
+  promoCode?: string;
   timestamp: string; // ISO string
 }
 
@@ -114,4 +118,18 @@ export interface StoreSettings {
   receiptHeader: string | null;
   receiptFooter: string | null;
   updatedAt: string;
+}
+
+export interface Promotion {
+  id: string;
+  name: string;
+  code: string;
+  discountType: 'FLAT' | 'PERCENT';
+  discountValue: number;
+  isActive: boolean;
+  minSubtotal?: number;
+  startDate?: string;
+  endDate?: string;
+  usageCount: number;
+  createdAt: string;
 }

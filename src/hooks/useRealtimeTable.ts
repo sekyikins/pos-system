@@ -133,12 +133,13 @@ export function useRealtimeTable<T extends { id: string }>({
           });
         }
       )
-      .subscribe(status => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           setConnectionStatus('connected');
         } else if (status === 'CHANNEL_ERROR') {
           setConnectionStatus('error');
-          console.error(`[useRealtimeTable] Channel error on "${table}". Retrying…`);
+          console.error(`[useRealtimeTable] Channel error on "${table}":`, err || 'Check if Realtime is enabled in Supabase Dashboard.');
+          // Simple retry by refetching; hook will re-run if this component unmounts/remounts
           setTimeout(refetch, 3000);
         } else if (status === 'TIMED_OUT') {
           setConnectionStatus('disconnected');

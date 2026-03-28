@@ -7,8 +7,9 @@ import { useCartStore, useToastStore, useSettingsStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Product, Customer } from '@/lib/types';
-import { getProducts, getPosCustomers, addPosCustomer } from '@/lib/db';
+import { Product, Customer, Promotion } from '@/lib/types';
+import { getProducts, getPosCustomers, addPosCustomer, getPromotions } from '@/lib/db';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { PaymentModal } from '@/components/pos/PaymentModal';
 import { ReceiptModal } from '@/components/pos/ReceiptModal';
 import { ShoppingCart, X, Minus, Plus, UserCircle, Tag, UserPlus, Search as SearchIcon } from 'lucide-react';
@@ -30,29 +31,36 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
 
   // Reference for products (used for max stock checks)
   const [products, setProducts] = useState<Product[]>([]);
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [csQuery, setCsQuery] = useState('');
   const [isQuickAdd, setIsQuickAdd] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState({ name: '', phone: '' });
 
+  const { data: allCustomers, refetch: refetchCustomers } = useRealtimeTable<Customer>({
+    table: 'customer',
+    initialData: [],
+    fetcher: getPosCustomers,
+    refetchOnChange: true
+  });
+
+  const { data: promotions } = useRealtimeTable<Promotion>({
+    table: 'promotions',
+    initialData: [],
+    fetcher: getPromotions,
+    refetchOnChange: true
+  });
+
   React.useEffect(() => {
     async function loadData() {
       const p = await getProducts();
       setProducts(p);
-      if (variant === 'pos') {
-        try {
-          const c = await getPosCustomers();
-          setAllCustomers(c);
-        } catch (e) { console.error('Customers failed', e); }
-      }
     }
     loadData();
-  }, [variant]);
+  }, []);
   
-  const selectedCustomer = allCustomers.find(c => c.id === selectedCustomerId);
-  const filteredCustomers = allCustomers.filter(c => 
+  const selectedCustomer = allCustomers.find((c: Customer) => c.id === selectedCustomerId);
+  const filteredCustomers = allCustomers.filter((c: Customer) => 
     c.name.toLowerCase().includes(csQuery.toLowerCase()) || 
     c.phone?.includes(csQuery)
   );
@@ -62,7 +70,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
     if (!quickAddForm.name) return;
     try {
       const newC = await addPosCustomer({ name: quickAddForm.name, phone: quickAddForm.phone || undefined });
-      setAllCustomers(prev => [...prev, newC]);
+      await refetchCustomers();
       setSelectedCustomerId(newC.id);
       setIsQuickAdd(false);
       setIsCustomerSearchOpen(false);
@@ -73,19 +81,31 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
   
   const [discountValue, setDiscountValue] = useState('0');
   const [discountType, setDiscountType] = useState<'FLAT' | 'PERCENT'>('FLAT');
+  const [selectedPromoId, setSelectedPromoId] = useState<string | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [lastSaleId, setLastSaleId] = useState<string | null>(null);
 
   const subtotal = cart.getTotal();
-  let discountAmount = 0;
+  let manualDiscount = 0;
+  let promoDiscount = 0;
   
   if (variant === 'pos') {
-    discountAmount = discountType === 'PERCENT'
+    manualDiscount = discountType === 'PERCENT'
       ? subtotal * (Math.min(parseFloat(discountValue) || 0, 100) / 100)
       : Math.min(parseFloat(discountValue) || 0, subtotal);
+
+    if (selectedPromoId) {
+      const promo = promotions.find(p => p.id === selectedPromoId && p.isActive);
+      if (promo && subtotal >= (promo.minSubtotal || 0)) {
+        promoDiscount = promo.discountType === 'PERCENT'
+          ? subtotal * (promo.discountValue / 100)
+          : Math.min(promo.discountValue, subtotal - manualDiscount);
+      }
+    }
   }
   
+  const discountAmount = manualDiscount + promoDiscount;
   const finalTotal = Math.max(subtotal - discountAmount, 0);
 
   const handleCheckoutClick = () => {
@@ -356,25 +376,48 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
            )}
         </div>
 
-        {/* POS Discount Section */}
+        {/* POS Discount & Promotions */}
         {variant === 'pos' && (
-          <div className="px-4 py-3 border-t border-border shrink-0">
+          <div className="px-4 py-3 border-t border-border bg-muted/20 space-y-3 shrink-0">
             <div className="flex items-center gap-2">
               <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm text-muted-foreground shrink-0">Discount:</span>
+              <div className="flex-1">
+                <select
+                  value={selectedPromoId || ''}
+                  onChange={e => setSelectedPromoId(e.target.value || null)}
+                  className="w-full h-9 px-2 text-xs font-bold rounded-xl border border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                >
+                  <option value="">Apply Promotion...</option>
+                  {promotions.filter(p => p.isActive).map(p => (
+                    <option key={p.id} value={p.id} disabled={subtotal < (p.minSubtotal || 0)}>
+                      {p.name} ({p.discountType === 'PERCENT' ? `${p.discountValue}%` : `${currencySymbol}${p.discountValue}`})
+                      {subtotal < (p.minSubtotal || 0) && ` - Min ${currencySymbol}${p.minSubtotal}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedPromoId && (
+                <button onClick={() => setSelectedPromoId(null)} className="p-1 hover:bg-destructive/10 text-destructive rounded-full">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-muted-foreground shrink-0">Add Discount:</span>
               <div className="flex flex-1 gap-1">
                 <input
                   type="number"
                   min="0"
                   value={discountValue}
                   onChange={e => setDiscountValue(e.target.value)}
-                  className="w-full h-8 px-2 text-sm rounded border border-border bg-muted/30 focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full h-8 px-2 text-sm font-bold rounded-lg border border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary"
                   placeholder="0"
                 />
                 <select
                   value={discountType}
                   onChange={e => setDiscountType(e.target.value as 'FLAT' | 'PERCENT')}
-                  className="h-8 px-2 text-sm rounded border border-border bg-muted/30 focus:outline-none cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="h-8 px-2 text-[10px] font-bold rounded-lg border border-border bg-card focus:outline-none cursor-pointer hover:bg-muted/50 transition-colors"
                 >
                   <option value="FLAT">{currencySymbol}</option>
                   <option value="PERCENT">%</option>
@@ -412,7 +455,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                 variant === 'storefront' ? 'pt-3' : 'pt-2 font-bold text-base text-foreground'
               }`}>
                 <span className={variant === 'storefront' ? 'text-sm font-bold text-foreground uppercase tracking-wider' : ''}>Total</span>
-                <span className={variant === 'storefront' ? 'text-3xl font-black text-foreground' : ''}>{currencySymbol}{finalTotal.toFixed(2)}</span>
+                <span className={variant === 'storefront' ? 'text-3xl font-bold text-foreground' : ''}>{currencySymbol}{finalTotal.toFixed(2)}</span>
               </div>
            </div>
 
@@ -447,6 +490,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
           finalTotal={finalTotal}
           customerId={selectedCustomerId || undefined}
           customerType={selectedCustomer?.type}
+          promoCode={promotions.find(p => p.id === selectedPromoId)?.code}
           onComplete={(saleId) => {
             setIsPaymentOpen(false);
             setLastSaleId(saleId);

@@ -11,11 +11,19 @@ import bcrypt from 'bcryptjs';
 /** Map Supabase snake_case row → Product */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProduct(row: any): Product {
+  if (!row) return {} as Product;
+  
+  const supplierInfo = Array.isArray(row.product_suppliers) ? row.product_suppliers[0] : row.product_suppliers;
   return {
     ...row,
-    price: Number(row.price),
+    categoryId: row.category_id || row.category,
+    category: row.categories?.name || row.category || 'Uncategorized',
+    price: Number(row.price || 0),
+    quantity: Number(row.quantity || 0),
     // Map from product_images table join
-    image_url: row.product_images?.[0]?.image_url || row.image_url || undefined,
+    image_url: Array.isArray(row.product_images) ? row.product_images[0]?.image_url : (row.image_url || undefined),
+    supplierId: supplierInfo?.supplier_id || undefined,
+    supplierName: supplierInfo?.suppliers?.name || undefined,
   };
 }
 
@@ -23,15 +31,17 @@ function toProduct(row: any): Product {
 /** Map Supabase snake_case row → Sale */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toSale(row: any): Sale {
+  if (!row) return {} as Sale;
   return {
     id: row.id,
     cashierId: row.cashier_id,
     customerId: row.customer_id,
-    items: (row.sales_items ?? []).map(toSalesItem),
-    totalAmount: Number(row.total_amount),
-    discount: Number(row.discount),
-    finalAmount: Number(row.final_amount),
+    items: Array.isArray(row.sales_items) ? row.sales_items.map(toSalesItem) : [],
+    totalAmount: Number(row.total_amount || 0),
+    discount: Number(row.discount || 0),
+    finalAmount: Number(row.final_amount || 0),
     paymentMethod: row.payment_method,
+    promoCode: row.promo_code || undefined,
     timestamp: row.created_at,
   };
 }
@@ -39,13 +49,14 @@ function toSale(row: any): Sale {
 /** Map Supabase snake_case row → SalesItem */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toSalesItem(row: any): SalesItem {
+  if (!row) return {} as SalesItem;
   return {
     id: row.id,
     productId: row.product_id,
     productName: row.product_name,
-    price: Number(row.price),
-    quantity: row.quantity,
-    subtotal: Number(row.subtotal),
+    price: Number(row.price || 0),
+    quantity: row.quantity || 0,
+    subtotal: Number(row.subtotal || 0),
   };
 }
 
@@ -66,7 +77,7 @@ function toInventoryLog(row: any): InventoryLog {
 export async function getProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
-    .select('*, product_images(image_url)')
+    .select('*, product_images(image_url), product_suppliers(supplier_id, suppliers(name)), categories(name)')
     .order('name');
   if (error) throw error;
   return (data ?? []).map(toProduct);
@@ -95,14 +106,36 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
 export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Promise<Product> {
   const { data: productRow, error: productErr } = await supabase
     .from('products')
-    .insert({ name: p.name, category: p.category, price: p.price, quantity: p.quantity, barcode: p.barcode })
+    .insert({ 
+      name: p.name, 
+      category_id: p.categoryId || null, 
+      category: p.category, 
+      price: p.price, 
+      quantity: p.quantity, 
+      barcode: p.barcode 
+    })
     .select()
     .single();
   if (productErr) throw productErr;
 
   const product = toProduct(productRow);
 
-  // 1. Upload image if provided
+  // 1. Handle Supplier (Check/Create and Link)
+  if (p.supplierName) {
+    // Find or create supplier
+    let { data: supplier } = await supabase.from('suppliers').select('id').eq('name', p.supplierName).single();
+    if (!supplier) {
+      const { data: newSup, error: supErr } = await supabase.from('suppliers').insert({ name: p.supplierName }).select('id').single();
+      if (!supErr) supplier = newSup;
+    }
+    if (supplier) {
+      await supabase.from('product_suppliers').insert({ product_id: product.id, supplier_id: supplier.id });
+      product.supplierId = supplier.id;
+      product.supplierName = p.supplierName;
+    }
+  }
+
+  // 2. Upload image if provided
   if (imageFile) {
     const fileExt = imageFile.name.split('.').pop();
     const fileName = `${product.id}-${Math.random()}.${fileExt}`;
@@ -133,6 +166,7 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Prom
 export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT', imageFile?: File): Promise<Product | null> {
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
+  if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
   if (updates.category !== undefined) row.category = updates.category;
   if (updates.price !== undefined) row.price = updates.price;
   if (updates.quantity !== undefined) row.quantity = updates.quantity;
@@ -144,9 +178,23 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
     .from('products')
     .update(row)
     .eq('id', id)
-    .select('*, product_images(image_url)')
+    .select('*, product_images(image_url), product_suppliers(supplier_id, suppliers(name))')
     .single();
   if (error) return null;
+
+  // Update Supplier link
+  if (updates.supplierName) {
+    let { data: supplier } = await supabase.from('suppliers').select('id').eq('name', updates.supplierName).single();
+    if (!supplier) {
+      const { data: newSup, error: supErr } = await supabase.from('suppliers').insert({ name: updates.supplierName }).select('id').single();
+      if (!supErr) supplier = newSup;
+    }
+    if (supplier) {
+      // For now we assume a product has one primary supplier we track here
+      await supabase.from('product_suppliers').delete().eq('product_id', id);
+      await supabase.from('product_suppliers').insert({ product_id: id, supplier_id: supplier.id });
+    }
+  }
 
   // Upload image if provided
   if (imageFile) {
@@ -211,7 +259,7 @@ export async function getSaleById(id: string): Promise<Sale | null> {
   return toSale(data);
 }
 
-export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'> & { customerType?: 'POS' | 'ECOMMERCE' }): Promise<Sale> {
+export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Promise<Sale> {
   // 1. Insert sale
   const { data: saleRow, error: saleErr } = await supabase
     .from('sales')
@@ -222,10 +270,14 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'> & { c
       discount: saleData.discount,
       final_amount: saleData.finalAmount,
       payment_method: saleData.paymentMethod,
+      promo_code: saleData.promoCode || null,
     })
     .select()
     .single();
-  if (saleErr) throw saleErr;
+  if (saleErr) {
+    console.error('Sale Insert Error:', saleErr);
+    throw saleErr;
+  }
 
   const saleId = saleRow.id;
 
@@ -260,10 +312,8 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'> & { c
 
   // 5. Update Loyalty Points (50 pts per purchase day)
   if (saleData.customerId) {
-    const table = saleData.customerType === 'ECOMMERCE' ? 'e_customer' : 'customer';
-    
     const { data: customer } = await supabase
-      .from(table)
+      .from('customer')
       .select('loyalty_points, last_purchase_date, order_count')
       .eq('id', saleData.customerId)
       .single();
@@ -271,6 +321,7 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'> & { c
     if (customer) {
       const today = new Date().toISOString().split('T')[0];
       const lastDate = customer.last_purchase_date;
+      const orderCount = Number(customer.order_count || 0);
       let newPoints = Number(customer.loyalty_points || 0);
       
       if (lastDate !== today) {
@@ -279,11 +330,19 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'> & { c
         newPoints += 10;
       }
 
-      await supabase.from(table).update({ 
+      await supabase.from('customer').update({ 
         loyalty_points: newPoints,
         last_purchase_date: today,
-        order_count: Number(customer.order_count || 0) + 1
+        order_count: orderCount + 1
       }).eq('id', saleData.customerId);
+    }
+  }
+
+  // 6. Update promo usage count
+  if (saleData.promoCode) {
+    const { data: promo } = await supabase.from('promotions').select('id, usage_count').eq('code', saleData.promoCode).single();
+    if (promo) {
+      await supabase.from('promotions').update({ usage_count: (promo.usage_count || 0) + 1 }).eq('id', promo.id);
     }
   }
 
@@ -393,6 +452,12 @@ export async function getPayments() {
 
 // ─── POS CUSTOMERS ─────────────────────────────────────────────────────────────
 export async function getPosCustomers(): Promise<Customer[]> {
+  const { data, error } = await supabase.from('customer').select('*').order('name');
+  if (error) throw error;
+  return (data || []).map(c => ({ ...c, type: 'POS' }));
+}
+
+export async function getAllCustomers(): Promise<Customer[]> {
   const { data: pos, error: posErr } = await supabase.from('customer').select('*').order('name');
   if (posErr) throw posErr;
   

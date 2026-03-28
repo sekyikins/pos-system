@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCartStore, useToastStore } from '@/lib/store';
 import { getProducts, getProductByBarcode } from '@/lib/db';
@@ -8,6 +8,7 @@ import { Product } from '@/lib/types';
 import { Navbar } from '@/components/layout/Navbar';
 import { CartSidebar } from '@/components/cart/CartSidebar';
 import { ProductGrid } from '@/components/product/ProductGrid';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { ShoppingCart, ShoppingBag, Search } from 'lucide-react';
 import { OnlineOrdersList } from '@/components/pos';
 
@@ -17,16 +18,17 @@ export default function POSPage() {
   const { addToast } = useToastStore();
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [lastBarcodeHit, setLastBarcodeHit] = useState<string | null>(null);
   const [view, setView] = useState<'POS' | 'ONLINE'>('POS');
 
-  useEffect(() => {
-    getProducts().then(setProducts).finally(() => setIsLoadingProducts(false));
-  }, []);
+  const { data: products, isLoading: isLoadingProducts } = useRealtimeTable<Product>({
+    table: 'products',
+    initialData: [],
+    fetcher: getProducts,
+    refetchOnChange: true
+  });
 
   const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

@@ -15,9 +15,9 @@ import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 type SortKey = 'name' | 'contact' | 'date';
 
 function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-black text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
+  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
+  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
+  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
 }
 
 export default function SuppliersPage() {
@@ -126,7 +126,7 @@ export default function SuppliersPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Truck className="h-8 w-8 text-primary" />
             Supplier Management
           </h1>
@@ -185,7 +185,7 @@ export default function SuppliersPage() {
           {isLoading ? (
             <div className="space-y-0">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-6 px-6 py-5 border-b border-border last:border-0 bg-muted/5">
+                <div key={i} className="flex items-center gap-6 p-5 border-b border-border last:border-0 bg-muted/5">
                   <Skeleton className="h-10 w-10 rounded-2xl" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-4 w-1/4" />
@@ -202,7 +202,7 @@ export default function SuppliersPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left align-middle">
-                <thead className="bg-muted/30 text-xs uppercase font-black text-muted-foreground/70">
+                <thead className="bg-muted/30 text-xs uppercase font-bold text-muted-foreground/70">
                   <tr>
                     <th className="px-6 py-4">Supplier</th>
                     <th className="px-6 py-4">Contact Person</th>
@@ -216,24 +216,24 @@ export default function SuppliersPage() {
                     <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium italic">No suppliers found.</td></tr>
                   ) : processed.map((s: Supplier) => (
                     <tr key={s.id} className="hover:bg-primary/5 transition-all group">
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-10 rounded-2xl bg-primary/20 text-primary flex items-center justify-center font-bold">
                             {s.name.charAt(0)}
                           </div>
                           <div>
-                             <p className="font-black text-foreground text-base">{s.name}</p>
+                             <p className="font-bold text-foreground text-base">{s.name}</p>
                              <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">REG: {s.id.slice(0,8)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                         <div className="flex items-center gap-2 font-bold text-foreground">
                           <User className="h-4 w-4 text-primary/60" />
                           {s.contactPerson || <span className="text-muted-foreground/40 italic">Not set</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                         <div className="space-y-1">
                           {s.email && (
                             <div className="flex items-center gap-2 text-xs font-medium">
@@ -248,7 +248,7 @@ export default function SuppliersPage() {
                           {!s.email && !s.phone && <span className="text-xs text-muted-foreground/40 italic">No contact info</span>}
                         </div>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="p-5">
                          <div className="flex items-start gap-2 max-w-[200px]">
                            <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
                            <p className="text-xs text-muted-foreground line-clamp-2">{s.address || 'No address provided'}</p>
