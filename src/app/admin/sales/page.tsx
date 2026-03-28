@@ -126,7 +126,7 @@ export default function SalesPage() {
                         </td>
                         <td className="px-6 py-4 font-bold">{currencySymbol}{sale.finalAmount.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right">
-                          <Button variant="ghost" size="mdh" className="h-8 w-8 p-0" onClick={() => handleView(sale)}>
+                          <Button variant="ghost" size="md" className="h-8 w-8 p-0" onClick={() => handleView(sale)}>
                             <Eye className="h-4 w-4 text-primary" />
                           </Button>
                         </td>
