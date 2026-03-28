@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -74,9 +75,9 @@ export default function ProductsPage() {
       }
       await load();
       handleCloseModal();
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      addToast(err.message || 'Failed to save product', 'error');
+      addToast(err instanceof Error ? err.message : 'Failed to save product', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -153,9 +154,9 @@ export default function ProductsPage() {
                       <tr key={product.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-6 py-4 font-medium">
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 min-w-[40px] rounded-lg bg-muted flex items-center justify-center overflow-hidden border border-border">
+                            <div className="relative h-10 w-10 min-w-[40px] rounded-lg bg-muted flex items-center justify-center overflow-hidden border border-border">
                               {product.image_url ? (
-                                <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                                <Image src={product.image_url} alt={product.name} fill className="object-cover" />
                               ) : (
                                 <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
                               )}
@@ -178,10 +179,10 @@ export default function ProductsPage() {
                         <td className="px-6 py-4 font-mono text-xs">{product.barcode}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="mdd" onClick={() => handleOpenModal(product)} className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="md" onClick={() => handleOpenModal(product)} className="h-8 w-8 p-0">
                               <Edit className="h-4 w-4 text-info" />
                             </Button>
-                            <Button variant="ghost" size="mdd" onClick={() => handleDelete(product.id, product.name)} className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10">
+                            <Button variant="ghost" size="md" onClick={() => handleDelete(product.id, product.name)} className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -201,7 +202,7 @@ export default function ProductsPage() {
           <div className="flex items-center justify-center py-4 px-2 border-2 border-dashed border-border rounded-2xl bg-muted/20 hover:bg-muted/30 transition-all cursor-pointer relative group">
             {previewUrl ? (
               <div className="relative h-40 w-full rounded-xl overflow-hidden shadow-sm">
-                <img src={previewUrl} alt="Preview" className="h-full w-full object-contain bg-muted/50" />
+                <Image src={previewUrl} alt="Preview" fill className="object-contain bg-muted/50" unoptimized />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <p className="text-white text-xs font-bold bg-black/50 px-3 py-1.5 rounded-full flex items-center gap-2">
                     <Upload className="h-3 w-3" /> Change Image
