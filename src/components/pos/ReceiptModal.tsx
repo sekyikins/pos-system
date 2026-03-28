@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { getSaleById } from '@/lib/db';
 import { Sale } from '@/lib/types';
 import { ShoppingBag, Printer, Download, CheckCircle2, FileText } from 'lucide-react';
+import { useSettingsStore } from '@/lib/store';
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ReceiptModalProps {
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, saleId }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [sale, setSale] = useState<Sale | null>(null);
+  const { storeName, currencySymbol, receiptHeader, receiptFooter } = useSettingsStore();
 
   useEffect(() => {
     if (!saleId || !isOpen) return;
@@ -37,20 +39,20 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
   const handlePrint = () => window.print();
 
-
   const handleDownloadText = () => {
     const lines: string[] = [
-      `=====      StarMart     =====`,
+      `=====      ${storeName}     =====`,
+      receiptHeader ? `${receiptHeader}` : '',
       `Date:    ${new Date(sale.timestamp).toLocaleString()}`,
       `Receipt: #${sale.id}`,
       `----------------------------`,
-      ...sale.items.map(item => `${item.productName.substring(0, 20).padEnd(20)} ${item.quantity}x $${item.price.toFixed(2)} = $${item.subtotal.toFixed(2)}`),
+      ...sale.items.map(item => `${item.productName.substring(0, 20).padEnd(20)} ${item.quantity}x ${currencySymbol}${item.price.toFixed(2)} = ${currencySymbol}${item.subtotal.toFixed(2)}`),
       `----------------------------`,
-      sale.discount > 0 ? `Discount:         -$${sale.discount.toFixed(2)}` : '',
-      `TOTAL:             $${sale.finalAmount.toFixed(2)}`,
+      sale.discount > 0 ? `Discount:         -${currencySymbol}${sale.discount.toFixed(2)}` : '',
+      `TOTAL:             ${currencySymbol}${sale.finalAmount.toFixed(2)}`,
       `PAYMENT: ${sale.paymentMethod}`,
       `============================`,
-      `       Thank you!`,
+      receiptFooter ? `${receiptFooter}` : `       Thank you!`,
     ].filter(Boolean);
 
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
@@ -83,9 +85,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
       const line = () => { doc.setDrawColor(200); doc.line(5, y, 75, y); y += 3; };
 
-      center('StarMart', 14);
-      center('123 Commerce Avenue', 8);
-      center('City, Country', 8);
+      center(storeName, 14);
+      if (receiptHeader) center(receiptHeader.split('\n')[0], 8);
       y += 2;
       line();
 
@@ -95,24 +96,24 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       line();
 
       sale.items.forEach(item => {
-        row(`${item.productName.substring(0, 22)}`, `$${item.subtotal.toFixed(2)}`);
+        row(`${item.productName.substring(0, 22)}`, `${currencySymbol}${item.subtotal.toFixed(2)}`);
         doc.setFontSize(7);
         doc.setTextColor(120);
-        doc.text(`  ${item.quantity} x $${item.price.toFixed(2)}`, 5, y);
+        doc.text(`  ${item.quantity} x ${currencySymbol}${item.price.toFixed(2)}`, 5, y);
         doc.setTextColor(0);
         y += 5;
       });
 
       line();
-      if (sale.discount > 0) row('Discount:', `-$${sale.discount.toFixed(2)}`, 9);
+      if (sale.discount > 0) row('Discount:', `-${currencySymbol}${sale.discount.toFixed(2)}`, 9);
       doc.setFont(undefined!, 'bold');
-      row('TOTAL:', `$${sale.finalAmount.toFixed(2)}`, 11);
+      row('TOTAL:', `${currencySymbol}${sale.finalAmount.toFixed(2)}`, 11);
       doc.setFont(undefined!, 'normal');
       row('Payment:', sale.paymentMethod, 8);
       y += 3;
       line();
 
-      center('Thank you for shopping with us!', 9);
+      center(receiptFooter || 'Thank you for shopping with us!', 9);
 
       doc.save(`receipt-${sale.id.slice(-8)}.pdf`);
     } catch (err) {
@@ -138,8 +139,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       >
         <div className="text-center mb-4">
           <ShoppingBag className="h-6 w-6 mx-auto mb-1" />
-          <p className="font-bold text-sm">StarMart</p>
-          <p className="text-muted-foreground text-[10px]">123 Commerce Avenue, City</p>
+          <p className="font-bold text-sm">{storeName}</p>
+          {receiptHeader && <p className="text-muted-foreground text-[10px] whitespace-pre-line">{receiptHeader}</p>}
         </div>
 
         <div className="space-y-0.5 text-muted-foreground mb-3 text-[10px]">
@@ -150,21 +151,21 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
         <div className="border-t border-dashed border-border pt-3 mb-3 space-y-2">
           {sale.items.map(item => (
             <div key={item.id}>
-              <div className="flex justify-between font-semibold">{item.productName}<span>${item.subtotal.toFixed(2)}</span></div>
-              <div className="text-muted-foreground text-[10px]">{item.quantity} × ${item.price.toFixed(2)}</div>
+              <div className="flex justify-between font-semibold">{item.productName}<span>{currencySymbol}{item.subtotal.toFixed(2)}</span></div>
+              <div className="text-muted-foreground text-[10px]">{item.quantity} × {currencySymbol}{item.price.toFixed(2)}</div>
             </div>
           ))}
         </div>
 
         <div className="border-t border-dashed border-border pt-3 space-y-1">
           {sale.discount > 0 && (
-            <div className="flex justify-between text-success"><span>Discount</span><span>-${sale.discount.toFixed(2)}</span></div>
+            <div className="flex justify-between text-success"><span>Discount</span><span>-{currencySymbol}{sale.discount.toFixed(2)}</span></div>
           )}
-          <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>${sale.finalAmount.toFixed(2)}</span></div>
+          <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>{currencySymbol}{sale.finalAmount.toFixed(2)}</span></div>
           <div className="flex justify-between text-muted-foreground text-[10px]"><span>Method</span><span>{sale.paymentMethod}</span></div>
         </div>
 
-        <div className="text-center text-[10px] text-muted-foreground mt-3">Thank you for shopping with us!</div>
+        <div className="text-center text-[10px] text-muted-foreground mt-3 whitespace-pre-line">{receiptFooter || 'Thank you for shopping with us!'}</div>
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `

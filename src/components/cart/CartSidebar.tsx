@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useCartStore, useToastStore } from '@/lib/store';
+import { useCartStore, useToastStore, useSettingsStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -24,6 +24,7 @@ interface CartSidebarProps {
 export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
   const cart = useCartStore();
   const { addToast } = useToastStore();
+  const { currencySymbol } = useSettingsStore();
   const { user } = useAuth();
   const router = useRouter();
 
@@ -286,18 +287,18 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                       {variant === 'storefront' ? (
                         <div>
                           <div className="font-bold text-foreground line-clamp-1 pr-6" title={item.productName}>{item.productName}</div>
-                          <div className="text-sm font-medium text-primary mb-2">${item.price.toFixed(2)}</div>
+                          <div className="text-sm font-medium text-primary mb-2">{currencySymbol}{item.price.toFixed(2)}</div>
                         </div>
                       ) : (
                         <div className="flex justify-between items-start">
                           <span className="font-medium text-sm truncate pr-2" title={item.productName}>{item.productName}</span>
-                          <span className="font-bold text-sm shrink-0">${item.subtotal.toFixed(2)}</span>
+                          <span className="font-bold text-sm shrink-0">{currencySymbol}{item.subtotal.toFixed(2)}</span>
                         </div>
                       )}
                       
                       <div className={`flex items-center justify-between ${variant === 'storefront' ? 'mt-auto' : ''}`}>
                          {variant === 'pos' && (
-                            <span className="text-xs text-muted-foreground/60">${item.price.toFixed(2)} each</span>
+                            <span className="text-xs text-muted-foreground/60">{currencySymbol}{item.price.toFixed(2)} each</span>
                          )}
                          <div className={`flex items-center gap-1 ${
                            variant === 'storefront' 
@@ -375,7 +376,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                   onChange={e => setDiscountType(e.target.value as 'FLAT' | 'PERCENT')}
                   className="h-8 px-2 text-sm rounded border border-border bg-muted/30 focus:outline-none cursor-pointer hover:bg-muted/50 transition-colors"
                 >
-                  <option value="FLAT">$</option>
+                  <option value="FLAT">{currencySymbol}</option>
                   <option value="PERCENT">%</option>
                 </select>
               </div>
@@ -392,18 +393,18 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
            <div className={`space-y-3 mb-6 ${variant === 'pos' ? 'text-sm text-muted-foreground mb-3 space-y-1.5' : ''}`}>
               <div className={`flex justify-between ${variant === 'storefront' ? 'text-sm text-muted-foreground font-medium' : ''}`}>
                 <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>{currencySymbol}{subtotal.toFixed(2)}</span>
               </div>
               {variant === 'storefront' ? (
                 <div className="flex justify-between text-sm text-muted-foreground font-medium">
                   <span>Tax (Estimated)</span>
-                  <span>$0.00</span>
+                  <span>{currencySymbol}0.00</span>
                 </div>
               ) : (
                 discountAmount > 0 && (
                   <div className="flex justify-between text-success">
-                    <span>Discount ({discountType === 'PERCENT' ? `${discountValue}%` : `$${discountValue}`})</span>
-                    <span>-${discountAmount.toFixed(2)}</span>
+                    <span>Discount ({discountType === 'PERCENT' ? `${discountValue}%` : `${currencySymbol}${discountValue}`})</span>
+                    <span>-{currencySymbol}{discountAmount.toFixed(2)}</span>
                   </div>
                 )
               )}
@@ -411,7 +412,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                 variant === 'storefront' ? 'pt-3' : 'pt-2 font-bold text-base text-foreground'
               }`}>
                 <span className={variant === 'storefront' ? 'text-sm font-bold text-foreground uppercase tracking-wider' : ''}>Total</span>
-                <span className={variant === 'storefront' ? 'text-3xl font-black text-foreground' : ''}>${finalTotal.toFixed(2)}</span>
+                <span className={variant === 'storefront' ? 'text-3xl font-black text-foreground' : ''}>{currencySymbol}{finalTotal.toFixed(2)}</span>
               </div>
            </div>
 
@@ -426,7 +427,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
              disabled={cart.items.length === 0 || (variant === 'pos' && !selectedCustomerId)}
              onClick={handleCheckoutClick}
            >
-             {variant === 'storefront' ? 'Proceed to Checkout' : `Charge $${finalTotal.toFixed(2)}`}
+             {variant === 'storefront' ? 'Proceed to Checkout' : `Charge ${currencySymbol}${finalTotal.toFixed(2)}`}
            </Button>
            
             {variant === 'storefront' && !user && cart.items.length > 0 && (

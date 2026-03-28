@@ -88,3 +88,96 @@ export async function updateOnlineOrderStatus(id: string, status: string, staffI
   const { error } = await supabase.from('online_orders').update(updates).eq('id', id);
   if (error) throw error;
 }
+
+// ─── Suppliers ─────────────────────────────────────────────────────────────
+import { Supplier, StoreSettings } from './types';
+
+export async function getSuppliers(): Promise<Supplier[]> {
+  const { data, error } = await supabase.from('suppliers').select('*').order('name');
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    contactPerson: row.contact_person,
+    email: row.email,
+    phone: row.phone,
+    address: row.address,
+    createdAt: row.created_at
+  }));
+}
+
+export async function addSupplier(s: Omit<Supplier, 'id' | 'createdAt'>): Promise<Supplier> {
+  const { data, error } = await supabase.from('suppliers').insert({
+    name: s.name,
+    contact_person: s.contactPerson,
+    email: s.email,
+    phone: s.phone,
+    address: s.address
+  }).select().single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name,
+    contactPerson: data.contact_person,
+    email: data.email,
+    phone: data.phone,
+    address: data.address,
+    createdAt: data.created_at
+  };
+}
+
+export async function updateSupplier(id: string, s: Partial<Supplier>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (s.name) row.name = s.name;
+  if (s.contactPerson !== undefined) row.contact_person = s.contactPerson;
+  if (s.email !== undefined) row.email = s.email;
+  if (s.phone !== undefined) row.phone = s.phone;
+  if (s.address !== undefined) row.address = s.address;
+
+  const { error } = await supabase.from('suppliers').update(row).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteSupplier(id: string): Promise<void> {
+  const { error } = await supabase.from('suppliers').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Store Settings ─────────────────────────────────────────────────────────
+
+export async function getStoreSettings(): Promise<StoreSettings> {
+  const { data, error } = await supabase.from('store_settings').select('*').limit(1).single();
+  if (error) {
+    // If no settings found, return default
+    return {
+      id: 'default',
+      storeName: 'My Store',
+      currency: 'USD',
+      taxRate: 0,
+      receiptHeader: null,
+      receiptFooter: null,
+      updatedAt: new Date().toISOString()
+    };
+  }
+  return {
+    id: data.id,
+    storeName: data.store_name,
+    currency: data.currency,
+    taxRate: Number(data.tax_rate),
+    receiptHeader: data.receipt_header,
+    receiptFooter: data.receipt_footer,
+    updatedAt: data.updated_at
+  };
+}
+
+export async function updateStoreSettings(id: string, s: Partial<StoreSettings>): Promise<void> {
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (s.storeName) row.store_name = s.storeName;
+  if (s.currency) row.currency = s.currency;
+  if (s.taxRate !== undefined) row.tax_rate = s.taxRate;
+  if (s.receiptHeader !== undefined) row.receipt_header = s.receiptHeader;
+  if (s.receiptFooter !== undefined) row.receipt_footer = s.receiptFooter;
+
+  const { error } = await supabase.from('store_settings').update(row).eq('id', id);
+  if (error) throw error;
+}

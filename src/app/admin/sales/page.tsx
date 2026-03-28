@@ -9,11 +9,13 @@ import { getSales } from '@/lib/db';
 import { Search, ShoppingBag, Banknote, CreditCard, Smartphone, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useSettingsStore } from '@/lib/store';
 
 const METHOD_ICON = { CASH: Banknote, CARD: CreditCard, MOBILE_MONEY: Smartphone };
 const METHOD_COLOR = { CASH: 'text-success', CARD: 'text-info', MOBILE_MONEY: 'text-warning' };
 
 export default function SalesPage() {
+  const { currencySymbol } = useSettingsStore();
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,7 +52,7 @@ export default function SalesPage() {
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, color: 'text-success' },
+          { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, color: 'text-success' },
           { label: 'Cash', value: cashSales, color: 'text-success' },
           { label: 'Card', value: cardSales, color: 'text-info' },
           { label: 'Mobile Money', value: mobileSales, color: 'text-warning' },
@@ -120,11 +122,11 @@ export default function SalesPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {sale.discount > 0 ? <span className="text-success">-${sale.discount.toFixed(2)}</span> : <span className="text-muted-foreground/40">—</span>}
+                          {sale.discount > 0 ? <span className="text-success">-{currencySymbol}{sale.discount.toFixed(2)}</span> : <span className="text-muted-foreground/40">—</span>}
                         </td>
-                        <td className="px-6 py-4 font-bold">${sale.finalAmount.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-bold">{currencySymbol}{sale.finalAmount.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleView(sale)}>
+                          <Button variant="ghost" size="mdh" className="h-8 w-8 p-0" onClick={() => handleView(sale)}>
                             <Eye className="h-4 w-4 text-primary" />
                           </Button>
                         </td>
@@ -162,17 +164,17 @@ export default function SalesPage() {
                     <tr key={item.id}>
                       <td className="px-4 py-3">{item.productName}</td>
                       <td className="px-4 py-3 text-center">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right">${item.price.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-medium">${item.subtotal.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right">{currencySymbol}{item.price.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-medium">{currencySymbol}{item.subtotal.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="text-sm space-y-1.5 border-t border-border pt-3">
-              <div className="flex justify-between text-muted-foreground"><span>Subtotal:</span><span>${selectedSale.totalAmount.toFixed(2)}</span></div>
-              {selectedSale.discount > 0 && <div className="flex justify-between text-success"><span>Discount:</span><span>-${selectedSale.discount.toFixed(2)}</span></div>}
-              <div className="flex justify-between font-bold text-base border-t border-border pt-2 mt-2"><span>Total:</span><span>${selectedSale.finalAmount.toFixed(2)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>Subtotal:</span><span>{currencySymbol}{selectedSale.totalAmount.toFixed(2)}</span></div>
+              {selectedSale.discount > 0 && <div className="flex justify-between text-success"><span>Discount:</span><span>-{currencySymbol}{selectedSale.discount.toFixed(2)}</span></div>}
+              <div className="flex justify-between font-bold text-base border-t border-border pt-2 mt-2"><span>Total:</span><span>{currencySymbol}{selectedSale.finalAmount.toFixed(2)}</span></div>
             </div>
           </div>
         )}

@@ -131,10 +131,10 @@ export default function CategoriesPage() {
                       <td className="px-6 py-4 text-muted-foreground">{c.description || '-'}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditOpen(c)}>
+                          <Button variant="ghost" size="mdh" className="h-8 w-8 p-0" onClick={() => handleEditOpen(c)}>
                             <Edit className="h-4 w-4 text-info" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(c)}>
+                          <Button variant="ghost" size="mdh" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(c)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

@@ -239,8 +239,8 @@ export default function StaffPage() {
                              {new Date(u.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                           </div>
                         </td>
-                        <td className="px-6 py-5 text-right">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <td className="pr-0 p-5 text-right">
+                          <div className="flex justify-around">
                             <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20" onClick={() => handleEditOpen(u)}>
                               <Edit className="h-4.5 w-4.5" />
                             </Button>

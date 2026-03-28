@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useCartStore, useToastStore } from '@/lib/store';
+import { useCartStore, useToastStore, useSettingsStore } from '@/lib/store';
 import { processSale } from '@/lib/db';
 import { useAuth } from '@/lib/auth';
 import { Banknote, CreditCard, Smartphone } from 'lucide-react';
@@ -30,6 +30,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const cart = useCartStore();
   const { addToast } = useToastStore();
+  const { currencySymbol } = useSettingsStore();
   const { user } = useAuth();
 
   const [method, setMethod] = useState<'CASH' | 'CARD' | 'MOBILE_MONEY'>('CASH');
@@ -98,12 +99,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           {discount > 0 && (
             <div className="flex justify-between text-muted-foreground">
               <span>Discount applied</span>
-              <span className="text-success">-${discount.toFixed(2)}</span>
+              <span className="text-success">-{currencySymbol}{discount.toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between items-baseline">
             <span className="text-muted-foreground text-base">Total Due</span>
-            <span className="font-black text-3xl">${finalTotal.toFixed(2)}</span>
+            <span className="font-black text-3xl">{currencySymbol}{finalTotal.toFixed(2)}</span>
           </div>
 
         </div>
@@ -112,7 +113,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {method === 'CASH' && (
           <div className="space-y-3">
             <Input
-              label="Amount Tendered ($)"
+              label={`Amount Tendered (${currencySymbol})`}
               type="number"
               step="0.01"
               min={finalTotal}
@@ -129,7 +130,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   : 'bg-destructive/10 text-destructive'
               }`}>
                 <span>Change Due:</span>
-                <span>{change >= 0 ? `$${change.toFixed(2)}` : 'Insufficient amount'}</span>
+                <span>{change >= 0 ? `${currencySymbol}${change.toFixed(2)}` : 'Insufficient amount'}</span>
               </div>
             )}
           </div>

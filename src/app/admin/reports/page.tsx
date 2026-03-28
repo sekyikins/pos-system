@@ -8,6 +8,7 @@ import { getSales, getProducts } from '@/lib/db';
 import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp, Wifi, WifiOff } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { useSettingsStore } from '@/lib/store';
 
 interface ProductStat { name: string; category: string; unitsSold: number; revenue: number; }
 interface DailyStat { date: string; sales: number; revenue: number; }
@@ -19,6 +20,8 @@ function ConnBadge({ status }: { status: ConnectionStatus }) {
 }
 
 export default function ReportsPage() {
+  const { currencySymbol } = useSettingsStore();
+
   const { data: sales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
     table: 'sales',
     initialData: [],
@@ -48,7 +51,7 @@ export default function ReportsPage() {
       breakdown[sale.paymentMethod].count++;
       breakdown[sale.paymentMethod].total += sale.finalAmount;
     });
-    return breakdown;
+    return Object.values(breakdown).length > 0 ? breakdown : {};
   }, [sales]);
 
   const productStats = useMemo(() => {
@@ -120,25 +123,24 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reports &amp; Analytics</h1>
-          <p className="text-sm text-muted-foreground">Business performance overview — updates in real time</p>
+          <p className="text-sm text-muted-foreground">Business performance overview</p>
         </div>
         <ConnBadge status={connectionStatus} />
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
+          { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
           { label: 'Total Transactions', value: sales.length, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
-          { label: 'Avg. Order Value', value: `$${avgOrderValue.toFixed(2)}`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
-          { label: 'Total Discounts Given', value: `$${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
+          { label: 'Avg/Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
+          { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
         ].map(item => (
           <Card key={item.label}>
-            <CardContent className="pt-5">
-              <div className={`inline-flex p-2 rounded-lg mb-3 ${item.bg}`}>
+            <CardContent className="pt-5 flex flex-col items-center sm:items-start">
+              <div className={`p-2 rounded-lg mb-3 ${item.bg}`}>
                 <item.icon className={`h-5 w-5 ${item.color}`} />
               </div>
-              <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
+              <div className="text-xl sm:text-2xl font-bold">{item.value}</div>
               <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
             </CardContent>
           </Card>
@@ -146,7 +148,6 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 14-day revenue chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5" />Daily Revenue — Last 14 Days</CardTitle>
@@ -156,9 +157,9 @@ export default function ReportsPage() {
               {dailyStats.map(d => (
                 <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
                   <div className="relative w-full flex justify-center">
-                    <div title={`$${d.revenue.toFixed(2)}`}
+                    <div title={`${currencySymbol}${d.revenue.toFixed(2)}`}
                       style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 120)}px` }}
-                      className="w-full bg-primary/70 hover:bg-primary rounded-t-sm transition-all cursor-pointer"
+                      className="w-full bg-primary/70 hover:bg-primary rounded-t-sm transition-all"
                     />
                   </div>
                   <span className="text-[9px] text-muted-foreground rotate-45 origin-left mt-1">
@@ -170,7 +171,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Top Products */}
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Top Products by Revenue</CardTitle></CardHeader>
           <CardContent>
@@ -184,7 +184,7 @@ export default function ReportsPage() {
                       <p className="text-xs text-muted-foreground">{p.category} · {p.unitsSold} units</p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-success shrink-0">${p.revenue.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-success shrink-0">{currencySymbol}{p.revenue.toFixed(2)}</span>
                 </div>
               ))}
               {productStats.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No data yet.</p>}
@@ -192,7 +192,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Category & Payment Breakdown */}
         <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Revenue by Category</CardTitle></CardHeader>
@@ -202,7 +201,7 @@ export default function ReportsPage() {
                   <div key={cat}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="font-medium">{cat}</span>
-                      <span className="text-muted-foreground">${rev.toFixed(2)}</span>
+                      <span className="text-muted-foreground">{currencySymbol}{rev.toFixed(2)}</span>
                     </div>
                     <div className="h-2 rounded-full bg-muted overflow-hidden">
                       <div className="h-full rounded-full bg-primary/70 transition-all" style={{ width: `${(rev / maxCat) * 100}%` }} />
@@ -222,9 +221,10 @@ export default function ReportsPage() {
                       <p className="text-sm font-medium">{method.replace('_', ' ')}</p>
                       <p className="text-xs text-muted-foreground">{stat.count} transactions</p>
                     </div>
-                    <Badge variant="secondary">${stat.total.toFixed(2)}</Badge>
+                    <Badge variant="secondary">{currencySymbol}{stat.total.toFixed(2)}</Badge>
                   </div>
                 ))}
+                {Object.entries(paymentBreakdown).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No sales data.</p>}
               </div>
             </CardContent>
           </Card>

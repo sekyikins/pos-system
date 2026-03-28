@@ -163,7 +163,7 @@ export default function OnlineOrdersPage() {
               <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Delivery Information</p>
               {selectedOrder.deliveryPointId ? (
                 <div>
-                  <p className="font-medium text-primary">Store Pickup</p>
+                  <p className="font-medium text-primary">Store Pickup - {deliveryPoints[selectedOrder.deliveryPointId]?.name}</p>
                   <p className="text-sm text-muted-foreground">{deliveryPoints[selectedOrder.deliveryPointId]?.name}</p>
                   <p className="text-xs text-muted-foreground mt-1">{deliveryPoints[selectedOrder.deliveryPointId]?.address}</p>
                 </div>

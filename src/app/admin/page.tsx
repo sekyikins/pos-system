@@ -94,7 +94,9 @@ export default function AdminDashboard() {
             <TrendingUp className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+{stats.totalSales}</div>
+            <div className="text-2xl font-bold">
+              {stats.totalSales < 1000 ? stats.totalSales : `${(stats.totalSales / 1000).toFixed(1)}k+`}
+            </div>
             <p className="text-xs text-muted-foreground">Transactions processed</p>
           </CardContent>
         </Card>

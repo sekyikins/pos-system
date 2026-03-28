@@ -5,13 +5,18 @@ import { LayoutContent } from '@/components/layout/LayoutContent';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
-  title: 'StarMart',
-  description: 'A responsive Point of Sale system built to simplify retail operations, helping businesses manage sales, inventory, and transactions in real time.',
-  icons: {
-    icon: '/favicon.png',
-  },
-};
+import { getStoreSettings } from '@/lib/db_extended';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getStoreSettings();
+  return {
+    title: settings.storeName,
+    description: `A responsive Point of Sale system built for ${settings.storeName} to simplify retail operations.`,
+    icons: {
+      icon: '/favicon.png',
+    },
+  };
+}
 
 export default function RootLayout({
   children,

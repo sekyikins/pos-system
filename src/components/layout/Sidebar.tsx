@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { ShoppingBag, Package, Users, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, UserCog } from 'lucide-react';
+import { ShoppingBag, Package, Users, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, UserCog, AlertTriangle, Truck, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,19 +15,22 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const pathname = usePathname();
 
     const allNavigation = [
       { name: 'Dashboard', href: '/admin', icon: BarChart3, roles: ['ADMIN', 'MANAGER'] },
-      { name: 'Categories', href: '/admin/categories', icon: Package, roles: ['ADMIN', 'MANAGER'] },
-      { name: 'Products', href: '/admin/products', icon: Package, roles: ['ADMIN', 'MANAGER'] },
-      { name: 'Inventory', href: '/admin/inventory', icon: Archive, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Sales', href: '/admin/sales', icon: ShoppingCart, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Online Orders', href: '/admin/online-orders', icon: ShoppingBag, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
-      { name: 'Delivery Points', href: '/admin/delivery-points', icon: Package, roles: ['ADMIN', 'MANAGER'] },
-      { name: 'Reports', href: '/admin/reports', icon: PieChart, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Products', href: '/admin/products', icon: Package, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Categories', href: '/admin/categories', icon: Archive, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Inventory', href: '/admin/inventory', icon: Package, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Customers', href: '/admin/customers', icon: Users, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Reports', href: '/admin/reports', icon: PieChart, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Staff', href: '/admin/staff', icon: UserCog, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Suppliers', href: '/admin/suppliers', icon: Truck, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Delivery Points', href: '/admin/delivery-points', icon: Package, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'Settings', href: '/admin/settings', icon: Settings, roles: ['ADMIN'] },
     ];
 
     const navigation = allNavigation.filter(item => item.roles.includes(user?.role || ''));
@@ -91,12 +95,38 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                <span className="text-xs text-muted-foreground mt-1">{user?.role}</span>
              </div>
           </div>
-          <Button variant="outline" fullWidth className="justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={logout}>
+          <Button variant="outline" fullWidth className="justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowLogoutConfirm(true)}>
             <LogOut className="h-5 w-5" />
             Sign Out
           </Button>
         </div>
+
       </aside>
+
+      {/* Logout Confirmation Modal */}
+      <Modal 
+        isOpen={showLogoutConfirm} 
+        onClose={() => setShowLogoutConfirm(false)} 
+        title="Confirm Logout"
+      >
+        <div className="space-y-6">
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-destructive/5 text-destructive border border-destructive/10">
+            <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-medium">Are you sure you want to sign out of the Admin Panel? Any unsaved changes may be lost.</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={logout}>
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

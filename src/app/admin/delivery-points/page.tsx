@@ -128,10 +128,10 @@ export default function DeliveryPointsPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditOpen(p)}>
+                          <Button variant="ghost" size="mdh" className="h-8 w-8 p-0" onClick={() => handleEditOpen(p)}>
                             <Edit className="h-4 w-4 text-info" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p)}>
+                          <Button variant="ghost" size="mdh" className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

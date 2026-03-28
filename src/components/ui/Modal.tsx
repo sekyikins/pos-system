@@ -8,9 +8,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  className?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className = 'max-w-lg' }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -25,12 +26,12 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 sm:p-0">
       <div 
         className="fixed inset-0 bg-background/20 backdrop-blur-sm transition-opacity" 
         onClick={onClose} 
       />
-      <div className="relative w-full max-w-lg rounded-xl bg-card border border-border card-shadow z-10 max-h-[90vh] flex flex-col">
+      <div className={`relative w-full rounded-xl bg-card border border-border card-shadow z-10 max-h-[90vh] flex flex-col ${className}`}>
         <div className="flex items-center bg-muted/30 justify-between border-b px-6 py-4 border-border">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button

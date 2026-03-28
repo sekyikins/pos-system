@@ -91,3 +91,48 @@ export const useToastStore = create<ToastState>((set) => ({
     toasts: state.toasts.filter(t => t.id !== id)
   }))
 }));
+
+// Global Application Settings Store
+import { getStoreSettings } from './db_extended';
+
+interface SettingsState {
+  storeName: string;
+  currency: string;
+  currencySymbol: string;
+  taxRate: number;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  initialized: boolean;
+  refreshSettings: () => Promise<void>;
+}
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', GHS: 'GH₵', NGN: '₦', KES: 'KSh', ZAR: 'R', JPY: '¥', CNY: '¥', INR: '₹', CAD: 'C$', AUD: 'A$'
+};
+
+export const useSettingsStore = create<SettingsState>((set) => ({
+  storeName: 'My Store',
+  currency: 'USD',
+  currencySymbol: '$',
+  taxRate: 0,
+  receiptHeader: null,
+  receiptFooter: null,
+  initialized: false,
+  refreshSettings: async () => {
+    try {
+      const s = await getStoreSettings();
+      set({
+        storeName: s.storeName,
+        currency: s.currency,
+        currencySymbol: CURRENCY_SYMBOLS[s.currency] || s.currency,
+        taxRate: s.taxRate,
+        receiptHeader: s.receiptHeader,
+        receiptFooter: s.receiptFooter,
+        initialized: true
+      });
+    } catch {
+      // Keep defaults if failed
+      set({ initialized: true });
+    }
+  }
+}));

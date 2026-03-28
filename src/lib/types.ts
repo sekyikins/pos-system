@@ -23,6 +23,7 @@ export interface Product {
   price: number;
   quantity: number;
   barcode: string;
+  image_url?: string;
 }
 
 export interface Category {
@@ -93,4 +94,24 @@ export interface InventoryLog {
   change: number; // positive or negative
   reason: 'RESTOCK' | 'SALE' | 'ADJUSTMENT';
   timestamp: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  createdAt: string;
+}
+
+export interface StoreSettings {
+  id: string;
+  storeName: string;
+  currency: string;
+  taxRate: number;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  updatedAt: string;
 }

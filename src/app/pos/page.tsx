@@ -79,35 +79,36 @@ export default function POSPage() {
           <div className="flex bg-muted/30 p-1 rounded-2xl w-full sm:w-auto">
              <button
                onClick={() => setView('POS')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
              >
                <ShoppingCart className="h-4 w-4" />
                Checkout
              </button>
              <button
                onClick={() => setView('ONLINE')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
              >
                <ShoppingBag className="h-4 w-4" />
                Online Orders
              </button>
           </div>
 
-          <div className="relative w-full max-w-lg">
-            <Search className="absolute left-3.5 top-3 h-5 w-5 text-muted-foreground/60" />
-            <input
-              ref={searchRef}
-              disabled={view === 'ONLINE'}
-              className="w-full h-11 rounded-xl border border-border bg-muted/50 pl-11 pr-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-base transition-all placeholder:text-muted-foreground/50 disabled:opacity-50"
-              placeholder={view === 'POS' ? "Search by name, category or scan barcode..." : "Global Search..."}
-              value={searchQuery}
-              onChange={handleSearchChange}
-              autoFocus
-            />
-          </div>
+          {view === 'POS' && (
+            <div className="relative flex-1 w-full max-w-sm sm:max-w-md md:max-w-xl lg:max-w-3xl xl:max-w-4xl transition-all duration-300">
+              <Search className="absolute left-3.5 top-3 h-5 w-5 text-muted-foreground/60" />
+              <input
+                ref={searchRef}
+                className="w-full h-11 rounded-xl border border-border bg-muted/50 pl-11 pr-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-base transition-all placeholder:text-muted-foreground/50"
+                placeholder="Search by name, category or scan barcode..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                autoFocus
+              />
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 lg:p-5">
+        <div className={`flex-1 overflow-y-auto ${view === 'POS' ? 'p-3 lg:p-5' : ''}`}>
           {view === 'POS' ? (
             <ProductGrid 
               products={filteredProducts}

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ShoppingBag } from 'lucide-react';
 import bcrypt from 'bcryptjs';
-import Link from 'next/link';
+
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -97,13 +97,6 @@ export default function LoginPage() {
         </form>
        </CardContent>
         <CardFooter className="flex flex-col space-y-4 text-sm text-muted-foreground">
-          <div className="text-center w-full">
-             Don&apos;t have an account?{' '}
-             <Link href="/signup" className="text-primary hover:underline font-medium">
-               Sign up
-             </Link>
-          </div>
-          
           <div className="w-full pt-4 border-t border-border">
              <p className="text-center w-full mb-2 text-xs">Test Accounts (Password: &apos;password&apos;)</p>
               <div className="grid grid-cols-3 gap-2 text-xs text-center">

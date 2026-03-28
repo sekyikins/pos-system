@@ -12,12 +12,10 @@ import bcrypt from 'bcryptjs';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProduct(row: any): Product {
   return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
+    ...row,
     price: Number(row.price),
-    quantity: row.quantity,
-    barcode: row.barcode,
+    // Map from product_images table join
+    image_url: row.product_images?.[0]?.image_url || row.image_url || undefined,
   };
 }
 
@@ -68,7 +66,7 @@ function toInventoryLog(row: any): InventoryLog {
 export async function getProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select('*, product_images(image_url)')
     .order('name');
   if (error) throw error;
   return (data ?? []).map(toProduct);
@@ -94,7 +92,7 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
   return toProduct(data);
 }
 
-export async function addProduct(p: Omit<Product, 'id'>): Promise<Product> {
+export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Promise<Product> {
   const { data: productRow, error: productErr } = await supabase
     .from('products')
     .insert({ name: p.name, category: p.category, price: p.price, quantity: p.quantity, barcode: p.barcode })
@@ -103,6 +101,22 @@ export async function addProduct(p: Omit<Product, 'id'>): Promise<Product> {
   if (productErr) throw productErr;
 
   const product = toProduct(productRow);
+
+  // 1. Upload image if provided
+  if (imageFile) {
+    const fileExt = imageFile.name.split('.').pop();
+    const fileName = `${product.id}-${Math.random()}.${fileExt}`;
+    const { error: storageErr } = await supabase.storage
+      .from('Products Images')
+      .upload(fileName, imageFile, { contentType: imageFile.type });
+    if (storageErr) {
+      console.error('Storage Upload Error:', storageErr);
+      throw new Error(`Image upload failed: ${storageErr.message}. Ensure the "Products Images" bucket exists and has correct policies.`);
+    }
+    const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
+    await supabase.from('product_images').insert({ product_id: product.id, image_url: publicUrl });
+    product.image_url = publicUrl;
+  }
 
   // Log initial stock to inventory
   if (product.quantity > 0) {
@@ -116,7 +130,7 @@ export async function addProduct(p: Omit<Product, 'id'>): Promise<Product> {
   return product;
 }
 
-export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT'): Promise<Product | null> {
+export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT', imageFile?: File): Promise<Product | null> {
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.category !== undefined) row.category = updates.category;
@@ -130,9 +144,27 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
     .from('products')
     .update(row)
     .eq('id', id)
-    .select()
+    .select('*, product_images(image_url)')
     .single();
   if (error) return null;
+
+  // Upload image if provided
+  if (imageFile) {
+    const fileExt = imageFile.name.split('.').pop();
+    const fileName = `${id}-${Math.random()}.${fileExt}`;
+    const { error: storageErr } = await supabase.storage
+      .from('Products Images')
+      .upload(fileName, imageFile, { contentType: imageFile.type });
+    if (storageErr) {
+      console.error('Storage Upload Error:', storageErr);
+      throw new Error(`Image upload failed: ${storageErr.message}. Ensure the "Products Images" bucket exists and has correct policies.`);
+    }
+    const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
+    // Delete old images first? For now just insert new one
+    await supabase.from('product_images').delete().eq('product_id', id);
+    await supabase.from('product_images').insert({ product_id: id, image_url: publicUrl });
+    data.product_images = [{ image_url: publicUrl }];
+  }
 
   const product = toProduct(data);
 

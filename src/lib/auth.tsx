@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isLoading) return;
 
     // Route Protection Logic
-    const isPublicRoute = pathname === '/' || pathname === '/login' || pathname === '/signup';
+    const isPublicRoute = pathname === '/' || pathname === '/login';
     
     if (!user && !isPublicRoute) {
        router.replace('/login');

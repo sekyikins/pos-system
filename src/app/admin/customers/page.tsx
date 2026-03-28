@@ -139,10 +139,10 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
                <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary">
                   <User className="h-6 w-6" />
                </div>
@@ -155,7 +155,7 @@ export default function CustomersPage() {
         </Card>
         <Card className="bg-info/5 border-info/20">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
                <div className="h-12 w-12 rounded-2xl bg-info/20 flex items-center justify-center text-info">
                   <Monitor className="h-6 w-6" />
                </div>
@@ -166,9 +166,9 @@ export default function CustomersPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-success/5 border-success/20">
+        <Card className="bg-success/5 border-success/20 col-span-2 md:col-span-1">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
                <div className="h-12 w-12 rounded-2xl bg-success/20 flex items-center justify-center text-success">
                   <Store className="h-6 w-6" />
                </div>
@@ -303,8 +303,8 @@ export default function CustomersPage() {
                           </p>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="pr-0 p-5 text-right">
+                        <div className="flex justify-around">
                           <Button 
                             variant="ghost" 
                             size="sm" 
