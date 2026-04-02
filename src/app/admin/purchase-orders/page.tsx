@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Truck, Plus, Search, FileText, CheckCircle, XCircle, ChevronRight, Loader2, Package, Trash2, ArrowUpRight } from 'lucide-react';
+import { Truck, Plus, Search, FileText, CheckCircle, XCircle, Loader2, Package, Trash2, ArrowUpRight, DollarSign } from 'lucide-react';
 import { PurchaseOrder, PurchaseOrderItem, Product, Supplier } from '@/lib/types';
 import { getPurchaseOrders, addPurchaseOrder, updatePurchaseOrderStatus, getProducts, getSuppliers } from '@/lib/db_extended';
 import { useToastStore, useSettingsStore } from '@/lib/store';
@@ -23,6 +23,7 @@ export default function PurchaseOrdersPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
@@ -52,12 +53,17 @@ export default function PurchaseOrdersPage() {
   }, []);
 
   const filteredOrders = useMemo(() => {
-    return purchaseOrders.filter(po => 
-      po.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      po.supplierName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      po.status.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [purchaseOrders, searchQuery]);
+    return purchaseOrders.filter(po => {
+      const matchSearch = po.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          po.supplierName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          po.status.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchStatus = filterStatus === 'ALL' || po.status === filterStatus;
+      return matchSearch && matchStatus;
+    });
+  }, [purchaseOrders, searchQuery, filterStatus]);
+
+  const filteredRevenue = filteredOrders.reduce((sum, po) => sum + po.totalAmount, 0);
+  const filteredCount = filteredOrders.length;
 
   const handleCreatePO = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +157,52 @@ export default function PurchaseOrdersPage() {
         </div>
       </div>
 
+      {/* Dynamic Summary Stats - Compact */}
+      <div className="grid grid-cols-2 gap-4">
+        {isLoading ? (
+          [...Array(2)].map((_, i) => (
+            <Card key={i} className="border-2 border-border/50 shadow-sm">
+              <CardContent className="py-4 flex flex-col items-center justify-center space-y-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-3 w-16 opacity-50" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <Card className="border-2 border-primary/20 bg-primary/5 shadow-sm overflow-hidden group hover:border-primary/40 transition-all">
+              <CardContent className="py-4 flex flex-col items-center justify-center relative">
+                <div className="absolute right-2 top-2 text-primary opacity-5">
+                   <DollarSign className="h-10 w-10" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold text-primary tracking-tighter tabular-nums drop-shadow-sm">
+                  {currencySymbol}{filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <ArrowUpRight className="h-3 w-3 text-primary/60" />
+                  {filterStatus === 'ALL' ? 'Total Spent' : `${filterStatus} Value`}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-info/20 bg-info/5 shadow-sm overflow-hidden group hover:border-info/40 transition-all">
+              <CardContent className="py-4 flex flex-col items-center justify-center relative">
+                <div className="absolute right-2 top-2 text-info opacity-5">
+                   <FileText className="h-10 w-10" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold text-info tracking-tighter tabular-nums drop-shadow-sm">
+                  {filteredCount}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <Package className="h-3 w-3 text-info/60" />
+                  {filterStatus === 'ALL' ? 'Total Orders' : `${filterStatus} Count`}
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border-2 border-border/50">
           <CardHeader className="pb-0 border-b border-border/50">
@@ -161,13 +213,24 @@ export default function PurchaseOrdersPage() {
                   <div className="relative w-full max-w-sm">
                     <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
                     <Input 
-                      placeholder="Search supplier, order ID, status..." 
+                      placeholder="Search supplier, order ID..." 
                       className="pl-10 h-11 rounded-xl bg-muted/20"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-               </div>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="h-11 w-full sm:w-[180px] px-4 text-sm font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/30 transition-all appearance-none cursor-pointer shadow-sm focus:outline-none focus:border-primary"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="RECEIVED">Received</option>
+                    <option value="CANCELLED">Rejected</option>
+                  </select>
+                </div>
              )}
           </CardHeader>
           <CardContent className="p-0">
