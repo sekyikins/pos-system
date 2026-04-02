@@ -1,0 +1,40 @@
+
+> pos-system@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.1.7 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 14.1s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/18) ...
+  Generating static pages using 7 workers (4/18) 
+  Generating static pages using 7 workers (8/18) 
+  Generating static pages using 7 workers (13/18) 
+Γ£ô Generating static pages using 7 workers (18/18) in 1056.0ms
+  Finalizing page optimization ...
+
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γö£ Γùï /admin
+Γö£ Γùï /admin/categories
+Γö£ Γùï /admin/customers
+Γö£ Γùï /admin/delivery-points
+Γö£ Γùï /admin/inventory
+Γö£ Γùï /admin/online-orders
+Γö£ Γùï /admin/products
+Γö£ Γùï /admin/promotions
+Γö£ Γùï /admin/reports
+Γö£ Γùï /admin/sales
+Γö£ Γùï /admin/settings
+Γö£ Γùï /admin/staff
+Γö£ Γùï /admin/suppliers
+Γö£ Γùï /login
+Γöö Γùï /pos
+
+
+Γùï  (Static)  prerendered as static content
+

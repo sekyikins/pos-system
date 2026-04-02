@@ -12,6 +12,7 @@ import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, Ticket, Loader2, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 // ─── Status Helper ────────────────────────────────────────────────────────────
 type PromoStatus = 'active' | 'past' | 'upcoming' | 'manual-active' | 'manual-inactive';
@@ -52,7 +53,7 @@ export default function PromotionsPage() {
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
 
-  const { data: promotions, isLoading, refetch } = useRealtimeTable<Promotion>({
+  const { data: promotions, isLoading, connectionStatus, refetch } = useRealtimeTable<Promotion>({
     table: 'promotions',
     initialData: [],
     fetcher: getPromotions,
@@ -164,16 +165,26 @@ export default function PromotionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-            <Ticket className="h-8 w-8 text-primary" />
-            Promotions &amp; Offers
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">Manage discounts and seasonal campaigns</p>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
+              <Ticket className="h-8 w-8 text-primary" />
+              Promotions &amp; Offers
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">Manage discounts and seasonal campaigns</p>
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <Button onClick={() => { resetForm(); setIsAddOpen(true); }} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
+            <Plus className="h-4 w-4" /> Add Promotion
+          </Button>
         </div>
-        <Button onClick={() => { resetForm(); setIsAddOpen(true); }} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> Add Promotion
-        </Button>
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
@@ -274,8 +285,8 @@ export default function PromotionsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="p-5 text-right">
-                          <div className="flex justify-end gap-2">
+                        <td className="p-5 pr-0">
+                          <div className="flex justify-end gap-2 pr-4">
                             <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20" onClick={() => handleEditOpen(p)}>
                               <Edit className="h-4.5 w-4.5" />
                             </Button>

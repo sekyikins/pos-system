@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/auth';
 import { Plus, Search, Edit, Trash2, Loader2, ShieldCheck, ShieldAlert, ArrowUpDown, Calendar, UserCheck } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 const ROLE_BADGE = {
   ADMIN: { label: 'Admin', class: 'bg-destructive/10 text-destructive' },
@@ -29,6 +30,8 @@ export default function StaffPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filterRole, setFilterRole] = useState('ALL');
+
   
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -39,7 +42,7 @@ export default function StaffPage() {
   const [addForm, setAddForm] = useState({ name: '', username: '', password: '', role: 'CASHIER' });
   const [editForm, setEditForm] = useState({ name: '', role: 'CASHIER', password: '' });
 
-  const { data: users, isLoading, refetch } = useRealtimeTable<UserRecord>({
+  const { data: users, isLoading, connectionStatus, refetch } = useRealtimeTable<UserRecord>({
     table: 'pos_staff',
     initialData: [],
     fetcher: getUsers,
@@ -49,11 +52,13 @@ export default function StaffPage() {
   const processed = useMemo(() => {
     const filtered = users.filter(u => {
       if (currentUser?.role === 'MANAGER' && u.role !== 'CASHIER') return false;
-      return (
+      const matchSearch = (
         u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.role.toLowerCase().includes(searchQuery.toLowerCase())
       );
+      const matchRole = filterRole === 'ALL' || u.role === filterRole;
+      return matchSearch && matchRole;
     });
 
     return filtered.sort((a, b) => {
@@ -72,16 +77,9 @@ export default function StaffPage() {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [users, searchQuery, currentUser, sortKey, sortOrder]);
+  }, [users, searchQuery, currentUser, sortKey, sortOrder, filterRole]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortOrder('asc');
-    }
-  };
+
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,16 +133,26 @@ export default function StaffPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <UserCheck className="h-8 w-8 text-primary" />
-            Staff Management
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">Coordinate system access and team coordination</p>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <UserCheck className="h-8 w-8 text-primary" />
+              Staff Management
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">Coordinate system access and team coordination</p>
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
+            <Plus className="h-4 w-4" /> Add Staff
+          </Button>
         </div>
-        <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> Add Staff
-        </Button>
       </div>
 
       <Card className="border-2 border-border/50">
@@ -159,14 +167,38 @@ export default function StaffPage() {
                 onChange={(e) => setSearchQuery(e.target.value)} 
               />
             </div>
-            <div className="flex gap-2">
-               <Button variant={sortKey === 'name' ? 'primary' : 'outline'} size="sm" onClick={() => toggleSort('name')} className="rounded-lg h-10 px-4">
-                  <ArrowUpDown className="h-4 w-4 mr-2" /> Name {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
-               <Button variant={sortKey === 'date' ? 'primary' : 'outline'} size="sm" onClick={() => toggleSort('date')} className="rounded-lg h-10 px-4">
-                  <Calendar className="h-4 w-4 mr-2" /> Date Added {sortKey === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
+            <div className="flex gap-2 w-full md:w-auto shrink-0">
+              <select
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="px-4 h-11 w-full sm:w-[150px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+              >
+                <option value="ALL">All Roles</option>
+                <option value="ADMIN">Admin</option>
+                <option value="MANAGER">Manager</option>
+                <option value="CASHIER">Cashier</option>
+              </select>
+              <div className="relative w-fit sm:w-auto shrink-0">
+                <ArrowUpDown className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
+              <select
+                value={`${sortKey}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newKey, newOrder] = e.target.value.split('-');
+                  setSortKey(newKey as SortKey);
+                  setSortOrder(newOrder as 'asc' | 'desc');
+                }}
+                className="pl-10 pr-8 h-11 w-full text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+              >
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+              </select>
+              <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
             </div>
+          </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">

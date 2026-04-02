@@ -9,23 +9,21 @@ import { Badge } from '@/components/ui/Badge';
 import { Customer } from '@/lib/types';
 import { getAllCustomers, addPosCustomer, updatePosCustomer, deletePosCustomer } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store, Wifi, WifiOff } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 type SortKey = 'name' | 'date' | 'loyalty';
 
-function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
-}
+// Unified LiveStatus replaces local ConnBadge
 
 export default function CustomersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filterType, setFilterType] = useState('ALL');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -40,11 +38,13 @@ export default function CustomersPage() {
   });
 
   const processed = useMemo(() => {
-    const filtered = customers.filter(c =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phone?.includes(searchQuery) ||
-      c.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filtered = customers.filter(c => {
+      const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          c.phone?.includes(searchQuery) ||
+                          c.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchType = filterType === 'ALL' || c.type === (filterType === 'STOREFRONT' ? 'ECOMMERCE' : 'POS');
+      return matchSearch && matchType;
+    });
 
     return [...filtered].sort((a, b) => {
       let valA: string | number = '';
@@ -65,16 +65,9 @@ export default function CustomersPage() {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [customers, searchQuery, sortKey, sortOrder]);
+  }, [customers, searchQuery, sortKey, sortOrder, filterType]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortOrder('asc');
-    }
-  };
+
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +124,7 @@ export default function CustomersPage() {
           <p className="text-sm text-muted-foreground font-medium">Overview of both in-store and e-commerce shoppers</p>
         </div>
         <div className="flex items-center gap-3">
-          <ConnBadge status={connectionStatus} />
+          <LiveStatus status={connectionStatus} />
           <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
             <Plus className="h-4 w-4" /> New POS Customer
           </Button>
@@ -139,45 +132,63 @@ export default function CustomersPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-               <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary">
-                  <User className="h-6 w-6" />
-               </div>
-               <div>
-                  <p className="text-sm font-bold text-muted-foreground">Total Database</p>
-                  <p className="text-2xl font-bold">{customers.length}</p>
-               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-info/5 border-info/20">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-               <div className="h-12 w-12 rounded-2xl bg-info/20 flex items-center justify-center text-info">
-                  <Monitor className="h-6 w-6" />
-               </div>
-               <div>
-                  <p className="text-sm font-bold text-muted-foreground">Storefront Users</p>
-                  <p className="text-2xl font-bold">{customers.filter(c => c.type === 'ECOMMERCE').length}</p>
-               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-success/5 border-success/20 col-span-2 md:col-span-1">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-               <div className="h-12 w-12 rounded-2xl bg-success/20 flex items-center justify-center text-success">
-                  <Store className="h-6 w-6" />
-               </div>
-               <div>
-                  <p className="text-sm font-bold text-muted-foreground">POS Customers</p>
-                  <p className="text-2xl font-bold">{customers.filter(c => c.type === 'POS').length}</p>
-               </div>
-            </div>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          [...Array(3)].map((_, i) => (
+            <Card key={i} className="bg-muted/5 border-border/50">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <Skeleton className="h-12 w-12 rounded-2xl" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-6 w-16" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                   <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary">
+                      <User className="h-6 w-6" />
+                   </div>
+                   <div>
+                      <p className="text-sm font-bold text-muted-foreground">Total Database</p>
+                      <p className="text-2xl font-bold">{customers.length}</p>
+                   </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-info/5 border-info/20">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                   <div className="h-12 w-12 rounded-2xl bg-info/20 flex items-center justify-center text-info">
+                      <Monitor className="h-6 w-6" />
+                   </div>
+                   <div>
+                      <p className="text-sm font-bold text-muted-foreground">Storefront Users</p>
+                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'ECOMMERCE').length}</p>
+                   </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-success/5 border-success/20 col-span-2 md:col-span-1">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                   <div className="h-12 w-12 rounded-2xl bg-success/20 flex items-center justify-center text-success">
+                      <Store className="h-6 w-6" />
+                   </div>
+                   <div>
+                      <p className="text-sm font-bold text-muted-foreground">POS Customers</p>
+                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'POS').length}</p>
+                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       <Card className="border-2 border-border/50">
@@ -193,16 +204,38 @@ export default function CustomersPage() {
               />
             </div>
             
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1">
-               <Button variant={sortKey === 'name' ? 'primary' : 'ghost'} size="sm" onClick={() => toggleSort('name')} className="whitespace-nowrap rounded-lg">
-                 <ArrowUpDown className="h-3 w-3 mr-1.5" /> Name {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
-               <Button variant={sortKey === 'loyalty' ? 'primary' : 'ghost'} size="sm" onClick={() => toggleSort('loyalty')} className="whitespace-nowrap rounded-lg">
-                 <Award className="h-3 w-3 mr-1.5" /> Loyalty {sortKey === 'loyalty' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
-               <Button variant={sortKey === 'date' ? 'primary' : 'ghost'} size="sm" onClick={() => toggleSort('date')} className="whitespace-nowrap rounded-lg">
-                 <Calendar className="h-3 w-3 mr-1.5" /> Date {sortKey === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
+            <div className="flex gap-2 w-full md:w-auto shrink-0">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="px-4 h-11 w-full sm:w-[150px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+              >
+                <option value="ALL">All Sources</option>
+                <option value="STOREFRONT">Storefront</option>
+                <option value="INSTORE">In-Store</option>
+              </select>
+              <div className="relative w-full sm:w-auto">
+                <ArrowUpDown className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
+                <select
+                  value={`${sortKey}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newKey, newOrder] = e.target.value.split('-');
+                    setSortKey(newKey as SortKey);
+                    setSortOrder(newOrder as 'asc' | 'desc');
+                  }}
+                  className="pl-10 pr-8 h-11 w-full sm:w-[200px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+                >
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="loyalty-desc">Highest Loyalty</option>
+                  <option value="loyalty-asc">Lowest Loyalty</option>
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                </select>
+                <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+              </div>
             </div>
           </div>
         </CardHeader>

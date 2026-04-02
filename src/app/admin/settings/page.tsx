@@ -1,247 +1,108 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { StoreSettings } from '@/lib/types';
-import { getStoreSettings, updateStoreSettings } from '@/lib/db';
-import { useToastStore } from '@/lib/store';
-import { Settings, Save, Store, Globe, Percent, FileText, CheckCircle2, Loader2 } from 'lucide-react';
+import { Settings, UserCog, Truck, MapPin, Ticket, LayoutGrid, Store, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { useAuth } from '@/lib/auth';
 
-const POPULAR_CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi' },
-  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
-  { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
-  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
-  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-];
+export default function SettingsHubPage() {
+  const { user } = useAuth();
 
-export default function StoreSettingsPage() {
-  const [settings, setSettings] = useState<StoreSettings | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const { addToast } = useToastStore();
-
-  const [form, setForm] = useState({
-    storeName: '',
-    currency: 'USD',
-    taxRate: 0,
-    receiptHeader: '',
-    receiptFooter: ''
-  });
-
-  useEffect(() => {
-    async function fetchSettings() {
-      try {
-        const data = await getStoreSettings();
-        setSettings(data);
-        setForm({
-          storeName: data.storeName,
-          currency: data.currency,
-          taxRate: data.taxRate,
-          receiptHeader: data.receiptHeader || '',
-          receiptFooter: data.receiptFooter || ''
-        });
-      } catch {
-        addToast('Failed to load settings', 'error');
-      } finally {
-        setIsLoading(false);
-      }
+  const managementModules = [
+    { 
+      name: 'Store Configuration', 
+      href: '/admin/settings/config', 
+      icon: Store, 
+      desc: 'Identity, currency, and tax rules', 
+      roles: ['ADMIN']
+    },
+    { 
+      name: 'Staff Management', 
+      href: '/admin/staff', 
+      icon: UserCog, 
+      desc: 'Roles and permissions', 
+      roles: ['ADMIN', 'MANAGER'] 
+    },
+    { 
+      name: 'Supplier Directory', 
+      href: '/admin/suppliers', 
+      icon: Truck, 
+      desc: 'Vendor list and contacts', 
+      roles: ['ADMIN', 'MANAGER'] 
+    },
+    { 
+      name: 'Delivery Areas', 
+      href: '/admin/delivery-points', 
+      icon: MapPin, 
+      desc: 'Pickup locations setup', 
+      roles: ['ADMIN', 'MANAGER'] 
+    },
+    { 
+      name: 'Promotions & Offers', 
+      href: '/admin/promotions', 
+      icon: Ticket, 
+      desc: 'Campaign codes and status', 
+      roles: ['ADMIN', 'MANAGER'] 
     }
-    fetchSettings();
-  }, [addToast]);
+  ];
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!settings) return;
-    setIsSaving(true);
-    try {
-      await updateStoreSettings(settings.id, form);
-      addToast('Application settings saved successfully', 'success');
-      // Update local state to reflect new settings
-      setSettings({ ...settings, ...form, updatedAt: new Date().toISOString() });
-    } catch {
-      addToast('Failed to save settings', 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const filteredModules = managementModules.filter(m => m.roles.includes(user?.role || ''));
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-12">
+    <div className="space-y-8 max-w-5xl mx-auto transition-all animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <Settings className="h-8 w-8 text-primary" />
-            Store Configuration
+          <h1 className="text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <Settings className="h-10 w-10 text-primary" />
+            Administrative Hub
           </h1>
-          <p className="text-sm text-muted-foreground font-medium">Global settings for your POS and e-commerce platforms</p>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border border-border/50">
-          Last updated: {settings ? new Date(settings.updatedAt).toLocaleDateString() : 'Never'}
+          <p className="text-sm text-muted-foreground font-medium mt-1">Configure your business rules and manage system entities</p>
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* General Settings */}
-          <div className="lg:col-span-2 space-y-8">
-            <Card className="border-2 border-border/50 shadow-sm overflow-hidden">
-              <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
-                <div className="flex items-center gap-3 text-lg font-bold uppercase tracking-wide">
-                  <Store className="h-5 w-5 text-primary" />
-                  General Information
-                </div>
-              </CardHeader>
-              <CardContent className="pt-5 space-y-6">
-                <Input 
-                  label="Store Identity Name" 
-                  value={form.storeName} 
-                  onChange={e => setForm({ ...form, storeName: e.target.value })} 
-                  required 
-                  placeholder="e.g., My Grocery Store"
-                  className="rounded-xl h-11"
-                  description="This name will appear on receipts and the shop storefront."
-                />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                   <div className="space-y-2">
-                     <label className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                       <Globe className="h-4 w-4" /> Global Currency
-                     </label>
-                     <select 
-                        className="w-full h-11 rounded-xl border border-border bg-muted/20 px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold"
-                        value={form.currency}
-                        onChange={e => setForm({ ...form, currency: e.target.value })}
-                     >
-                       {POPULAR_CURRENCIES.map(c => (
-                         <option key={c.code} value={c.code}>
-                           {c.code} ({c.symbol}) - {c.name}
-                         </option>
-                       ))}
-                     </select>
-                   </div>
-                   
-                   <div className="space-y-2">
-                     <label className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                       <Percent className="h-4 w-4" /> Default Tax Rate (%)
-                     </label>
-                     <Input 
-                        type="number" 
-                        step="0.01" 
-                        min="0" 
-                        max="100"
-                        value={form.taxRate.toString()} 
-                        onChange={e => setForm({ ...form, taxRate: parseFloat(e.target.value) || 0 })}
-                        className="rounded-xl h-11"
-                      />
-                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Receipt Styling */}
-            <Card className="border-2 border-border/50 shadow-sm overflow-hidden">
-               <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
-                  <div className="flex items-center gap-3 text-lg font-bold uppercase tracking-wide">
-                    <FileText className="h-5 w-5 text-primary" />
-                    Receipt Content
+      <div className="grid grid-cols-1 gap-8">
+        <Card className="border-2 border-border/50 shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
+          <CardHeader className="bg-muted/30 border-b border-border/50 pb-6 pt-8 px-8">
+            <div className="flex items-center gap-3 text-xl font-bold uppercase tracking-widest text-foreground">
+              <LayoutGrid className="h-6 w-6 text-primary" />
+              Management Modules
+            </div>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredModules.map((module) => (
+                <Link key={module.name} href={module.href}>
+                  <div className="flex items-center justify-between p-3 rounded-xl border-2 transition-all group cursor-pointer h-full shadow-sm hover:shadow-xl bg-primary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/40">
+                    <div className="flex items-center gap-2">
+                      <div className="h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-md bg-primary text-primary-foreground">
+                        <module.icon className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">{module.name}</p>
+                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest opacity-80 group-hover:opacity-100">{module.desc}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted/20 text-muted-foreground/40 group-hover:bg-primary/20 group-hover:text-primary transition-all">
+                      <ChevronRight className="h-6 w-6" />
+                    </div>
                   </div>
-               </CardHeader>
-               <CardContent className="pt-5 space-y-6">
-                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-muted-foreground">Receipt Header Message</label>
-                    <textarea 
-                      className="w-full min-h-[100px] p-4 rounded-2xl border-2 border-border/50 bg-muted/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 outline-none transition-all text-sm font-medium resize-none"
-                      placeholder="Welcome to our store! Thank you for shopping with us."
-                      value={form.receiptHeader}
-                      onChange={e => setForm({ ...form, receiptHeader: e.target.value })}
-                    />
-                 </div>
-                 <div className="space-y-2 focus-within:ring-0">
-                    <label className="text-sm font-bold text-muted-foreground">Receipt Footer / Terms</label>
-                    <textarea 
-                      className="w-full min-h-[100px] p-4 rounded-2xl border-2 border-border/50 bg-muted/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 outline-none transition-all text-sm font-medium resize-none shadow-inner"
-                      placeholder="All sales are final. Please keep this receipt for warranty claims."
-                      value={form.receiptFooter}
-                      onChange={e => setForm({ ...form, receiptFooter: e.target.value })}
-                    />
-                 </div>
-               </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar / Preview */}
-          <div className="space-y-6">
-            <Card className="border-2 border-primary/20 bg-primary/5 shadow-none overflow-hidden sticky top-8">
-               <CardHeader className="bg-primary/10 border-b border-primary/10">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" /> Live Preview
-                  </h3>
-               </CardHeader>
-               <CardContent className="p-6">
-                  <div className="bg-card border-l-4 border-primary rounded-xl p-6 shadow-xl space-y-4">
-                     <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Current Store:</p>
-                        <p className="text-xl font-bold text-foreground line-clamp-1">{form.storeName || 'My Store'}</p>
-                     </div>
-                     <div className="h-px bg-border/40" />
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-0.5">
-                           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Currency:</p>
-                           <p className="text-lg font-bold text-primary">{POPULAR_CURRENCIES.find(c => c.code === form.currency)?.symbol} ({form.currency})</p>
-                        </div>
-                        <div className="space-y-0.5">
-                           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Taxation:</p>
-                           <p className="text-lg font-bold text-foreground">{form.taxRate}%</p>
-                        </div>
-                     </div>
-                  </div>
-                  
-                  <div className="mt-4">
-                    <Button 
-                      fullWidth 
-                      type="submit" 
-                      disabled={isSaving}
-                      className="font-bold text-lg gap-2 rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-5 w-5" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-[10px] text-center mt-4 text-muted-foreground font-medium px-4">
-                      Changes will be applied instantly across all platforms (POS & E-commerce).
-                    </p>
-                  </div>
-               </CardContent>
-            </Card>
-          </div>
-        </div>
-      </form>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-muted/20 border-dashed border-2 border-border/50 shadow-none">
+          <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
+            <div className="h-12 w-12 rounded-full bg-background flex items-center justify-center text-muted-foreground">
+              <Settings className="h-6 w-6" />
+            </div>
+            <h4 className="font-bold text-sm">Need Help?</h4>
+            <p className="text-xs text-muted-foreground">Contact support for advanced system configurations</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

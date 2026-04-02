@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -13,11 +13,14 @@ import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, Package, Loader2, Upload, ImageIcon, Boxes, Barcode, Truck } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 export default function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<'name' | 'category' | 'price' | 'stock'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -28,7 +31,7 @@ export default function ProductsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const { data: products, isLoading, refetch } = useRealtimeTable<Product>({
+  const { data: products, isLoading, connectionStatus, refetch } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
@@ -46,12 +49,35 @@ export default function ProductsPage() {
     loadResources();
   }, []);
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.barcode.includes(searchQuery) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const processedProducts = useMemo<Product[]>(() => {
+    const filtered = products.filter(p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.barcode.includes(searchQuery) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return [...filtered].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+      if (sortKey === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (sortKey === 'category') {
+        valA = a.category.toLowerCase();
+        valB = b.category.toLowerCase();
+      } else if (sortKey === 'price') {
+        valA = a.price;
+        valB = b.price;
+      } else if (sortKey === 'stock') {
+        valA = a.quantity;
+        valB = b.quantity;
+      }
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [products, searchQuery, sortKey, sortOrder]);
 
   const handleOpenModal = (product?: Product) => {
     if (product) {
@@ -122,21 +148,31 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-            <Boxes className="h-8 w-8 text-primary" />
-            Products
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">Manage your store inventory and catalog</p>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
+              <Boxes className="h-8 w-8 text-primary" />
+              Products
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">Manage your store inventory and catalog</p>
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <Button onClick={() => handleOpenModal()} className="gap-2 shrink-0 h-11 px-6 rounded-xl font-bold shadow-lg shadow-primary/20" disabled={isLoading}>
+            <Plus className="h-4 w-4" /> Add Product
+          </Button>
         </div>
-        <Button onClick={() => handleOpenModal()} className="gap-2 shrink-0">
-          <Plus className="h-4 w-4" /> Add Product
-        </Button>
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
         <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex items-center gap-2 pb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -145,6 +181,29 @@ export default function ProductsPage() {
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
               />
+            </div>
+            <div className="relative w-full sm:w-auto shrink-0">
+              <select
+                value={`${sortKey}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newKey, newOrder] = e.target.value.split('-');
+                  setSortKey(newKey as 'name' | 'category' | 'price' | 'stock');
+                  setSortOrder(newOrder as 'asc' | 'desc');
+                }}
+                className="px-4 pr-8 h-11 w-full sm:w-[200px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+              >
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="category-asc">Category (A-Z)</option>
+                <option value="category-desc">Category (Z-A)</option>
+                <option value="price-asc">Lowest Price</option>
+                <option value="price-desc">Highest Price</option>
+                <option value="stock-asc">Lowest Stock</option>
+                <option value="stock-desc">Highest Stock</option>
+              </select>
+              <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -176,14 +235,14 @@ export default function ProductsPage() {
                     <th className="p-5">Stock Status</th>
                     <th className="p-5">Supplier</th>
                     <th className="p-5">Barcode</th>
-                    <th className="p-5 text-right">Actions</th>
+                    <th className="p-5 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {filteredProducts.length === 0 ? (
+                  {processedProducts.length === 0 ? (
                     <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No products found.</td></tr>
                   ) : (
-                    filteredProducts.map((product) => (
+                    processedProducts.map((product: Product) => (
                       <tr key={product.id} className="hover:bg-primary/5 transition-all group">
                         <td className="p-3">
                           <div className="flex items-center gap-4">
@@ -232,7 +291,7 @@ export default function ProductsPage() {
                         <td className="p-3 font-mono text-[14px] text-muted-foreground font-semibold tracking-tighter">
                           {product.barcode}
                         </td>
-                        <td className="p-3 text-right">
+                        <td className="p-5 pr-0">
                           <div className="flex justify-end gap-3">
                             <Button variant="ghost" size="sm" onClick={() => handleOpenModal(product)} className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20">
                               <Edit className="h-4.5 w-4.5" />

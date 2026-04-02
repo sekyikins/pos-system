@@ -2,7 +2,8 @@ export * from './db';
 // Extend this file via append to avoid large replace_file_content
 
 import { supabase } from './supabase';
-import { Category, DeliveryPoint, OnlineOrder } from './types';
+import { adjustInventory } from './db';
+import { Category, DeliveryPoint, OnlineOrder, Expense, PurchaseOrder, PurchaseOrderItem } from './types';
 
 export async function getCategories(): Promise<Category[]> {
   const { data, error } = await supabase.from('categories').select('*').order('name');
@@ -249,5 +250,122 @@ export async function updatePromotion(id: string, p: Partial<Promotion>): Promis
 
 export async function deletePromotion(id: string): Promise<void> {
   const { error } = await supabase.from('promotions').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Purchase Orders ───────────────────────────────────────────────────────
+
+export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
+  const { data, error } = await supabase
+    .from('purchase_orders')
+    .select('*, suppliers(name), purchase_order_items(*, products(name))')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    supplierId: row.supplier_id,
+    supplierName: row.suppliers?.name,
+    status: row.status,
+    totalAmount: Number(row.total_amount),
+    createdAt: row.created_at,
+    items: (row.purchase_order_items || []).map((item: { id: string; po_id: string; product_id: string; products?: { name: string }; quantity: number; unit_cost: number; subtotal: number; created_at: string }) => ({
+      id: item.id,
+      poId: item.po_id,
+      productId: item.product_id,
+      productName: item.products?.name,
+      quantity: item.quantity,
+      unitCost: Number(item.unit_cost),
+      subtotal: Number(item.subtotal),
+      createdAt: item.created_at,
+    })),
+  }));
+}
+
+export async function addPurchaseOrder(po: Omit<PurchaseOrder, 'id' | 'createdAt'>, items: Omit<PurchaseOrderItem, 'id' | 'poId' | 'createdAt'>[]): Promise<PurchaseOrder> {
+  const { data: poRow, error: poErr } = await supabase
+    .from('purchase_orders')
+    .insert({
+      supplier_id: po.supplierId,
+      status: po.status,
+      total_amount: po.totalAmount,
+    })
+    .select()
+    .single();
+  if (poErr) throw poErr;
+
+  const itemRows = items.map(item => ({
+    po_id: poRow.id,
+    product_id: item.productId,
+    quantity: item.quantity,
+    unit_cost: item.unitCost,
+    subtotal: item.subtotal,
+  }));
+
+  const { error: itemsErr } = await supabase.from('purchase_order_items').insert(itemRows);
+  if (itemsErr) throw itemsErr;
+
+  return { ...poRow, items: [] }; // Items not fully mapped here for simplicity in return
+}
+
+export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrder['status']): Promise<void> {
+  // If moving to RECEIVED, update stock
+  if (status === 'RECEIVED') {
+    const { data: po, error: poErr } = await supabase
+      .from('purchase_orders')
+      .select('*, purchase_order_items(*)')
+      .eq('id', id)
+      .single();
+    
+    if (poErr) throw poErr;
+    if (po.status === 'RECEIVED') return; // already received
+
+    for (const item of po.purchase_order_items) {
+      await adjustInventory(item.product_id, item.quantity, 'PURCHASE_ORDER');
+    }
+  }
+
+  const { error } = await supabase
+    .from('purchase_orders')
+    .update({ status })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Expenses ─────────────────────────────────────────────────────────────
+
+export async function getExpenses(): Promise<Expense[]> {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*, pos_staff(name)')
+    .order('expense_date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    description: row.description,
+    amount: Number(row.amount),
+    expenseDate: row.expense_date,
+    loggedBy: row.logged_by,
+    loggedByName: row.pos_staff?.name,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function addExpense(e: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({
+      description: e.description,
+      amount: e.amount,
+      expense_date: e.expenseDate,
+      logged_by: e.loggedBy,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  const { error } = await supabase.from('expenses').delete().eq('id', id);
   if (error) throw error;
 }

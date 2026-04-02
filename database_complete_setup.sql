@@ -55,7 +55,7 @@ CREATE TABLE public.inventory (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     change INTEGER NOT NULL, -- Positive for restock, negative for sale/loss
-    reason TEXT NOT NULL CHECK (reason IN ('RESTOCK', 'SALE', 'ADJUSTMENT')),
+    reason TEXT NOT NULL CHECK (reason IN ('RESTOCK', 'SALE', 'ADJUSTMENT', 'PURCHASE_ORDER')),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
@@ -194,13 +194,6 @@ CREATE TABLE public.product_reviews (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- 5.5 Persistent E-Commerce Cart
-CREATE TABLE public.e_cart (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    e_customer_id UUID REFERENCES public.e_customer(id) ON DELETE CASCADE UNIQUE,
-    items JSONB DEFAULT '[]'::jsonb,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- 5.6 Promotions
 CREATE TABLE public.promotions (
@@ -292,8 +285,6 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_e_cart_updated_at BEFORE UPDATE
-    ON e_cart FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_store_settings_updated_at BEFORE UPDATE
     ON store_settings FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
@@ -336,7 +327,6 @@ ALTER TABLE public.delivery_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.online_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.online_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.e_cart ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_orders ENABLE ROW LEVEL SECURITY;
@@ -362,7 +352,6 @@ CREATE POLICY "Allow all to public" ON public.delivery_points FOR ALL USING (tru
 CREATE POLICY "Allow all to public" ON public.online_orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.online_order_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.product_reviews FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all to public" ON public.e_cart FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.promotions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.suppliers FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.purchase_orders FOR ALL USING (true) WITH CHECK (true);
@@ -385,7 +374,6 @@ DECLARE
     'pos_staff',
     'customer',
     'e_customer',
-    'e_cart',
     'online_order_items',
     'sales_items',
     'product_suppliers'

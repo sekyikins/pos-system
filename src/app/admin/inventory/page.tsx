@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,34 +13,70 @@ import { useToastStore } from '@/lib/store';
 import { Search, History, ArrowUpCircle, ArrowDownCircle, AlertCircle, Plus, Loader2 } from 'lucide-react';
 
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<'name' | 'stock' | 'adjusted'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState<'RESTOCK' | 'ADJUSTMENT'>('RESTOCK');
   const [isSaving, setIsSaving] = useState(false);
   const { addToast } = useToastStore();
 
-  const { data: products, isLoading: productsLoading, refetch: refetchProducts } = useRealtimeTable<Product>({
+  const { data: products, isLoading: productsLoading, connectionStatus: productsStatus, refetch: refetchProducts } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
     refetchOnChange: true
   });
 
-  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useRealtimeTable<InventoryLog>({
+  const { data: logs, isLoading: logsLoading, connectionStatus: logsStatus, refetch: refetchLogs } = useRealtimeTable<InventoryLog>({
     table: 'inventory',
     initialData: [],
     fetcher: getInventoryLogs,
     refetchOnChange: true
   });
 
+  const connectionStatus = productsStatus === 'connected' && logsStatus === 'connected' ? 'connected' : 
+                          productsStatus === 'error' || logsStatus === 'error' ? 'error' : 'connecting';
+
   const isLoading = productsLoading || logsLoading;
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode.includes(searchQuery)
-  );
+  const processedProducts = useMemo(() => {
+    const filtered = products.filter(p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode.includes(searchQuery)
+    );
+
+    const lastAdjusted = new Map<string, number>();
+    logs.forEach(log => {
+      const time = new Date(log.timestamp).getTime();
+      if (!lastAdjusted.has(log.productId) || lastAdjusted.get(log.productId)! < time) {
+        lastAdjusted.set(log.productId, time);
+      }
+    });
+
+    return [...filtered].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+      
+      if (sortKey === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (sortKey === 'stock') {
+        valA = a.quantity;
+        valB = b.quantity;
+      } else if (sortKey === 'adjusted') {
+        valA = lastAdjusted.get(a.id) || 0;
+        valB = lastAdjusted.get(b.id) || 0;
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [products, searchQuery, logs, sortKey, sortOrder]);
 
   const handleAdjustSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,26 +98,57 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory Control</h1>
-          <p className="text-sm text-muted-foreground">Monitor stock levels and view change history</p>
-        </div>
+      <div className="flex items-center justify-between">
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Inventory Control</h1>
+            <p className="text-sm text-muted-foreground">Monitor stock levels and view change history</p>
+          </div>
+        )}
+        <LiveStatus status={connectionStatus} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Inventory List */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 h-[calc(100vh-13rem)] overflow-hidden flex flex-col">
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
               <CardTitle>Current Stock</CardTitle>
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/50" />
-                <Input placeholder="Search items..." className="pl-9 h-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-[200px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/50" />
+                  <Input placeholder="Search items..." className="pl-9 h-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                </div>
+                <div className="relative w-full sm:w-auto shrink-0">
+                  <select
+                    value={`${sortKey}-${sortOrder}`}
+                    onChange={(e) => {
+                      const [newKey, newOrder] = e.target.value.split('-');
+                      setSortKey(newKey as 'name' | 'stock' | 'adjusted');
+                      setSortOrder(newOrder as 'asc' | 'desc');
+                    }}
+                    className="px-3 pr-8 h-9 w-full sm:w-[160px] text-xs rounded-lg border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+                  >
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="stock-desc">Highest Stock</option>
+                    <option value="stock-asc">Lowest Stock</option>
+                    <option value="adjusted-desc">Recently Adjusted</option>
+                    <option value="adjusted-asc">Oldest Adjusted</option>
+                  </select>
+                  <div className="absolute right-2.5 top-2.5 pointer-events-none text-muted-foreground/60">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className='overflow-y-auto'>
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(6)].map((_, i) => (
@@ -99,7 +166,7 @@ export default function InventoryPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredProducts.map(product => (
+                {processedProducts.map((product: Product) => (
                   <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg border-border bg-muted/20">
                     <div className="flex-1 flex flex-col gap-1 mb-3 sm:mb-0">
                       <div className="flex items-center gap-2">
@@ -123,7 +190,7 @@ export default function InventoryPage() {
                     </div>
                   </div>
                 ))}
-                {filteredProducts.length === 0 && (
+                {processedProducts.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">No products found in inventory.</div>
                 )}
               </div>
@@ -132,12 +199,12 @@ export default function InventoryPage() {
         </Card>
 
         {/* Recent Activity Log */}
-        <Card>
+        <Card className='h-[calc(100vh-13rem)] flex flex-col'>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Recent Activity</CardTitle>
             <CardDescription>Latest stock changes</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className='overflow-y-auto'>
             {isLoading ? (
               <div className="space-y-4">
                  {[...Array(8)].map((_, i) => (

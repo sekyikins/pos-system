@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { ShoppingBag } from 'lucide-react';
 import bcrypt from 'bcryptjs';
+import { useSettingsStore } from '@/lib/store';
 
 
 export default function LoginPage() {
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const { storeName } = useSettingsStore();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +46,7 @@ export default function LoginPage() {
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader className="space-y-1 text-center">
+      <CardHeader className="space-y-1 text-center border-none">
         <div className="flex justify-center mb-4">
           <div className="rounded-full bg-primary/10 p-3">
             <ShoppingBag className="h-6 w-6 text-primary" />
@@ -52,7 +54,7 @@ export default function LoginPage() {
         </div>
         <CardTitle className="text-2xl">Sign In</CardTitle>
         <CardDescription>
-          Enter your credentials to access the POS system
+          Enter your credentials to access { storeName }
         </CardDescription>
       </CardHeader>
       <CardContent>

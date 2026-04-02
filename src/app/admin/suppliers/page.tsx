@@ -8,17 +8,12 @@ import { Modal } from '@/components/ui/Modal';
 import { Supplier } from '@/lib/types';
 import { getSuppliers, addSupplier, updateSupplier, deleteSupplier } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Truck, User, Phone, Mail, MapPin, Wifi, WifiOff, ArrowUpDown, Calendar } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Truck, User, Phone, Mail, MapPin, ArrowUpDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 type SortKey = 'name' | 'contact' | 'date';
-
-function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
-}
 
 export default function SuppliersPage() {
   const [isSaving, setIsSaving] = useState(false);
@@ -35,6 +30,7 @@ export default function SuppliersPage() {
     table: 'suppliers',
     initialData: [],
     fetcher: getSuppliers,
+    refetchOnChange: true
   });
 
   const processed = useMemo(() => {
@@ -64,15 +60,6 @@ export default function SuppliersPage() {
       return 0;
     });
   }, [suppliers, searchQuery, sortKey, sortOrder]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortOrder('asc');
-    }
-  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,16 +112,23 @@ export default function SuppliersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Truck className="h-8 w-8 text-primary" />
-            Supplier Management
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">Manage your product vendors and contact details</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <ConnBadge status={connectionStatus} />
-          <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Truck className="h-8 w-8 text-primary" />
+              Supplier Management
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">Manage your product vendors and contact details</p>
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Add Supplier
           </Button>
         </div>
@@ -153,31 +147,27 @@ export default function SuppliersPage() {
               />
             </div>
             
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1">
-               <Button 
-                 variant={sortKey === 'name' ? 'primary' : 'ghost'} 
-                 size="sm" 
-                 onClick={() => toggleSort('name')}
-                 className="whitespace-nowrap rounded-lg"
-               >
-                 <ArrowUpDown className="h-3 w-3 mr-1.5" /> Name {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
-               <Button 
-                variant={sortKey === 'contact' ? 'primary' : 'ghost'} 
-                size="sm" 
-                onClick={() => toggleSort('contact')}
-                className="whitespace-nowrap rounded-lg"
-               >
-                 <User className="h-3 w-3 mr-1.5" /> Contact {sortKey === 'contact' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
-               <Button 
-                variant={sortKey === 'date' ? 'primary' : 'ghost'} 
-                size="sm" 
-                onClick={() => toggleSort('date')}
-                className="whitespace-nowrap rounded-lg"
-               >
-                 <Calendar className="h-3 w-3 mr-1.5" /> Date {sortKey === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
-               </Button>
+            <div className="relative w-full md:w-auto shrink-0">
+              <ArrowUpDown className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
+              <select
+                value={`${sortKey}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newKey, newOrder] = e.target.value.split('-');
+                  setSortKey(newKey as SortKey);
+                  setSortOrder(newOrder as 'asc' | 'desc');
+                }}
+                className="pl-10 pr-8 h-11 w-full text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+              >
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="contact-asc">Contact (A-Z)</option>
+                <option value="contact-desc">Contact (Z-A)</option>
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+              </select>
+              <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -201,8 +191,8 @@ export default function SuppliersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left align-middle">
-                <thead className="bg-muted/30 text-xs uppercase font-bold text-muted-foreground/70">
+              <table className="w-full text-sm text-left align-middle font-medium">
+                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
                   <tr>
                     <th className="px-6 py-4">Supplier</th>
                     <th className="px-6 py-4">Contact Person</th>
@@ -222,7 +212,7 @@ export default function SuppliersPage() {
                             {s.name.charAt(0)}
                           </div>
                           <div>
-                             <p className="font-bold text-foreground text-base">{s.name}</p>
+                             <p className="font-bold text-foreground text-base tracking-tight">{s.name}</p>
                              <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">REG: {s.id.slice(0,8)}</p>
                           </div>
                         </div>
@@ -255,21 +245,11 @@ export default function SuppliersPage() {
                          </div>
                       </td>
                       <td className="pr-0 p-5 text-right">
-                        <div className="flex justify-around gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-info/20 text-info" 
-                            onClick={() => handleEditOpen(s)}
-                          >
+                        <div className="flex justify-end gap-2 pr-6">
+                           <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-info/20 text-info" onClick={() => handleEditOpen(s)}>
                             <Edit className="h-4.5 w-4.5" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-destructive/10 text-destructive" 
-                            onClick={() => handleDelete(s.id)}
-                          >
+                           <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-destructive/10 text-destructive" onClick={() => handleDelete(s.id)}>
                             <Trash2 className="h-4.5 w-4.5" />
                           </Button>
                         </div>
@@ -283,7 +263,6 @@ export default function SuppliersPage() {
         </CardContent>
       </Card>
 
-      {/* Add Modal */}
       <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add New Supplier">
         <form onSubmit={handleAdd} className="space-y-4">
           <Input label="Supplier Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Acme Corp" />
@@ -302,7 +281,6 @@ export default function SuppliersPage() {
         </form>
       </Modal>
 
-      {/* Edit Modal */}
       <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Supplier Record">
         <form onSubmit={handleUpdate} className="space-y-4">
           <Input label="Supplier Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />

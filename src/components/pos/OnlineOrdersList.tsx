@@ -6,11 +6,12 @@ import { OnlineOrder, StaffRecord, AuthUser } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Loader2, ShoppingBag, Truck, CheckCircle, Package, Clock, XCircle, User, Wifi, WifiOff } from 'lucide-react';
+import { Loader2, ShoppingBag, Truck, CheckCircle, Package, Clock, XCircle, User } from 'lucide-react';
 import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/lib/auth';
-import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   PENDING:   { label: 'Pending',     color: 'bg-warning/10 text-warning border-warning/20',         icon: Clock },
@@ -20,23 +21,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: React.Ele
   CANCELLED: { label: 'Cancelled',   color: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle },
 };
 
-function ConnectionBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return (
-    <span className="flex items-center gap-1.5 text-[10px] font-bold text-success uppercase tracking-widest">
-      <Wifi className="h-3.5 w-3.5" /> Live
-    </span>
-  );
-  if (status === 'error' || status === 'disconnected') return (
-    <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive uppercase tracking-widest">
-      <WifiOff className="h-3.5 w-3.5" /> Offline
-    </span>
-  );
-  return (
-    <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-      <span className="h-2 w-2 rounded-full bg-muted-foreground animate-pulse" /> Syncing...
-    </span>
-  );
-}
+// Removed local ConnectionBadge in favor of global LiveStatus
 
 export function OnlineOrdersList() {
   const { addToast } = useToastStore();
@@ -195,8 +180,7 @@ export function OnlineOrdersList() {
           </div>
           <div className="flex items-center justify-between md:justify-end gap-6 px-1">
              <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full animate-pulse ${connectionStatus === 'connected' ? 'bg-success' : 'bg-destructive'}`} />
-                <ConnectionBadge status={connectionStatus} />
+                <LiveStatus status={connectionStatus} />
              </div>
           </div>
         </div>

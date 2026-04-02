@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -11,10 +11,10 @@ import { getDeliveryPoints, addDeliveryPoint, updateDeliveryPoint, deleteDeliver
 import { useToastStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, Loader2, MapPin } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 export default function DeliveryPointsPage() {
-  const [points, setPoints] = useState<DeliveryPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -22,14 +22,14 @@ export default function DeliveryPointsPage() {
   const [editingPoint, setEditingPoint] = useState<DeliveryPoint | null>(null);
   const { addToast } = useToastStore();
 
+  const { data: points, isLoading, connectionStatus, refetch } = useRealtimeTable<DeliveryPoint>({
+    table: 'delivery_points',
+    initialData: [],
+    fetcher: getDeliveryPoints,
+    refetchOnChange: true
+  });
+
   const [form, setForm] = useState({ name: '', address: '', active: true });
-
-  const load = async () => {
-    setIsLoading(true);
-    try { setPoints(await getDeliveryPoints()); } finally { setIsLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
 
   const filtered = points.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -43,7 +43,7 @@ export default function DeliveryPointsPage() {
     try {
       await addDeliveryPoint(form.name, form.address, form.active);
       addToast('Delivery point created', 'success');
-      await load();
+      await refetch();
       setIsAddOpen(false);
       setForm({ name: '', address: '', active: true });
     } catch { addToast('Failed to create delivery point', 'error'); }
@@ -63,7 +63,7 @@ export default function DeliveryPointsPage() {
     try {
       await updateDeliveryPoint(editingPoint.id, form.name, form.address, form.active);
       addToast('Delivery point updated', 'success');
-      await load();
+      await refetch();
       setIsEditOpen(false);
     } catch { addToast('Failed to update', 'error'); }
     finally { setIsSaving(false); }
@@ -74,23 +74,33 @@ export default function DeliveryPointsPage() {
     try {
       await deleteDeliveryPoint(p.id);
       addToast('Delivery point deleted', 'info');
-      await load();
+      await refetch();
     } catch { addToast('Failed to delete (may be in use)', 'error'); }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-            <MapPin className="h-8 w-8 text-primary" />
-            Logistical Points
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">Manage E-commerce pickup locations and physical branch points</p>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight text-foreground">
+              <MapPin className="h-8 w-8 text-primary" />
+              Logistical Points
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">Manage E-commerce pickup locations and physical branch points</p>
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <Button onClick={() => { setForm({ name: '', address: '', active: true }); setIsAddOpen(true); }} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
+            <Plus className="h-4 w-4" /> Add Location
+          </Button>
         </div>
-        <Button onClick={() => { setForm({ name: '', address: '', active: true }); setIsAddOpen(true); }} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> Add Location
-        </Button>
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
@@ -160,11 +170,11 @@ export default function DeliveryPointsPage() {
                         )}
                       </td>
                       <td className="p-5 text-right">
-                        <div className="flex justify-around">
-                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20" onClick={() => handleEditOpen(p)}>
+                        <div className="flex justify-around gap-2 pr-4">
+                           <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20" onClick={() => handleEditOpen(p)}>
                             <Edit className="h-4.5 w-4.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-destructive rounded-xl bg-muted/50 hover:bg-destructive/10" onClick={() => handleDelete(p)}>
+                           <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p)}>
                             <Trash2 className="h-4.5 w-4.5" />
                           </Button>
                         </div>
@@ -189,7 +199,7 @@ export default function DeliveryPointsPage() {
               id="activeAdd" 
               checked={form.active} 
               onChange={(e) => setForm({ ...form, active: e.target.checked })} 
-              className="h-5 w-5 rounded-lg border-primary accent-primary"
+              className="h-5 w-5 rounded-lg border-primary accent-primary cursor-pointer"
             />
             <label htmlFor="activeAdd" className="text-sm font-bold uppercase tracking-widest text-muted-foreground cursor-pointer select-none">
               Mark as Operational
@@ -216,7 +226,7 @@ export default function DeliveryPointsPage() {
               id="activeEdit" 
               checked={form.active} 
               onChange={(e) => setForm({ ...form, active: e.target.checked })} 
-              className="h-5 w-5 rounded-lg border-primary accent-primary"
+              className="h-5 w-5 rounded-lg border-primary accent-primary cursor-pointer"
             />
             <label htmlFor="activeEdit" className="text-sm font-bold uppercase tracking-widest text-muted-foreground cursor-pointer select-none">
               Operational Status (Active)
@@ -234,4 +244,3 @@ export default function DeliveryPointsPage() {
     </div>
   );
 }
-

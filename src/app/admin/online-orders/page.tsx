@@ -8,10 +8,12 @@ import { Badge } from '@/components/ui/Badge';
 import { OnlineOrder, DeliveryPoint } from '@/lib/types';
 import { getOnlineOrders, updateOnlineOrderStatus, getDeliveryPoints } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Search, ShoppingBag, Eye, Wifi, WifiOff } from 'lucide-react';
+import { Search, ShoppingBag, Eye } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
+import { useSettingsStore } from '@/lib/store';
 
 const STATUS_BADGE: Record<string, { label: string; class: string }> = {
   PENDING:   { label: 'Pending',   class: 'bg-warning/10 text-warning border-warning/20' },
@@ -21,16 +23,12 @@ const STATUS_BADGE: Record<string, { label: string; class: string }> = {
   CANCELLED: { label: 'Cancelled', class: 'bg-destructive/10 text-destructive border-destructive/20' },
 };
 
-function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
-}
-
 export default function OnlineOrdersPage() {
   const [deliveryPoints, setDeliveryPoints] = useState<Record<string, DeliveryPoint>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const { addToast } = useToastStore();
+  const { currencySymbol } = useSettingsStore();
   const [selectedOrder, setSelectedOrder] = useState<OnlineOrder | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -49,11 +47,13 @@ export default function OnlineOrdersPage() {
   });
 
   const filtered = useMemo(() =>
-    orders.filter(o =>
-      o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase())
-    ), [orders, searchQuery]);
+    orders.filter(o => {
+      const matchSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          o.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          o.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchStatus = filterStatus === 'ALL' || o.status === filterStatus;
+      return matchSearch && matchStatus;
+    }), [orders, searchQuery, filterStatus]);
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setIsUpdating(true);
@@ -78,14 +78,28 @@ export default function OnlineOrdersPage() {
           <h1 className="text-3xl font-bold tracking-tight">Online Orders</h1>
           <p className="text-sm text-muted-foreground">Manage E-commerce storefront orders</p>
         </div>
-        <ConnBadge status={connectionStatus} />
+        <LiveStatus status={connectionStatus} />
       </div>
 
       <Card>
         <CardHeader>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
-            <Input placeholder="Search by ID, Status, Route..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              <Input placeholder="Search by ID, Status, Route..." className="pl-9 h-11 rounded-xl" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-card text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer shadow-sm"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="SHIPPED">Shipped</option>
+              <option value="DELIVERED">Delivered</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
           </div>
         </CardHeader>
         <CardContent>
@@ -109,7 +123,7 @@ export default function OnlineOrdersPage() {
                     <th className="px-6 py-3">Delivery Type</th>
                     <th className="px-6 py-3">Amount</th>
                     <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3 text-right">Actions</th>
+                    <th className="px-6 py-3 text-center">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -120,9 +134,11 @@ export default function OnlineOrdersPage() {
                     const isPickup = !!o.deliveryPointId;
                     return (
                       <tr key={o.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-5 font-mono text-xs flex items-center gap-2">
-                          <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                        <td className="p-5 font-mono text-xs gap-2">
+                          <div className='flex justify-center'>
+                            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                           {o.id.slice(-8).toUpperCase()}
+                          </div>
                         </td>
                         <td className="p-5 text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</td>
                         <td className="p-5">
@@ -131,13 +147,15 @@ export default function OnlineOrdersPage() {
                             : <span className="text-info font-medium">Delivery</span>
                           }
                         </td>
-                        <td className="p-5 flex justify-center font-bold text-success">${o.totalAmount.toFixed(2)}</td>
+                        <td className="p-5 font-bold text-success">
+                          <div className=' flex justify-center'>{currencySymbol}{o.totalAmount.toFixed(2)}</div>
+                        </td>
                         <td className="p-5">
                           <Badge variant="outline" className={statusBadge.class}>{statusBadge.label}</Badge>
                         </td>
                         <td className="p-5 text-right">
                           <Button variant="ghost" size="sm" onClick={() => { setSelectedOrder(o); setIsViewOpen(true); }}>
-                            <Eye className="h-4 w-4 mr-2" /> View
+                            <Eye className="h-4 w-4 mr-2" />
                           </Button>
                         </td>
                       </tr>
@@ -157,7 +175,7 @@ export default function OnlineOrdersPage() {
               <div><p className="text-xs text-muted-foreground">Order ID</p><p className="font-mono text-sm">{selectedOrder.id}</p></div>
               <div><p className="text-xs text-muted-foreground">Date</p><p className="text-sm">{new Date(selectedOrder.createdAt).toLocaleString()}</p></div>
               <div><p className="text-xs text-muted-foreground">Payment Method</p><p className="text-sm font-medium">{selectedOrder.paymentMethod.replace(/_/g, ' ')}</p></div>
-              <div><p className="text-xs text-muted-foreground">Total Amount</p><p className="text-sm font-bold text-success">${selectedOrder.totalAmount.toFixed(2)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Total Amount</p><p className="text-sm font-bold text-success">{currencySymbol}{selectedOrder.totalAmount.toFixed(2)}</p></div>
             </div>
             <div className="bg-muted/30 p-4 rounded-xl border border-border">
               <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Delivery Information</p>

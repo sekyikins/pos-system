@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useSettingsStore } from '@/lib/store';
 
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 const METHOD_ICON = { CASH: Banknote, CARD: CreditCard, MOBILE_MONEY: Smartphone };
 const METHOD_COLOR = { CASH: 'text-success', CARD: 'text-info', MOBILE_MONEY: 'text-warning' };
@@ -19,20 +20,23 @@ const METHOD_COLOR = { CASH: 'text-success', CARD: 'text-info', MOBILE_MONEY: 't
 export default function SalesPage() {
   const { currencySymbol } = useSettingsStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterMethod, setFilterMethod] = useState('ALL');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
-  const { data: sales, isLoading } = useRealtimeTable<Sale>({
+  const { data: sales, isLoading, connectionStatus } = useRealtimeTable<Sale>({
     table: 'sales',
     initialData: [],
     fetcher: getSales,
     refetchOnChange: true
   });
 
-  const filtered = sales.filter(s =>
-    s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.cashierId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = sales.filter(s => {
+    const matchSearch = s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        s.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        s.cashierId.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchMethod = filterMethod === 'ALL' || s.paymentMethod === filterMethod;
+    return matchSearch && matchMethod;
+  });
 
   const handleView = async (sale: Sale) => {
     setSelectedSale(sale);
@@ -53,28 +57,40 @@ export default function SalesPage() {
           </h1>
           <p className="text-sm text-muted-foreground font-medium">All recorded point-of-sale transactions</p>
         </div>
+        <LiveStatus status={connectionStatus} />
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, color: 'text-success' },
-          { label: 'Cash', value: cashSales, color: 'text-success' },
-          { label: 'Card', value: cardSales, color: 'text-info' },
-          { label: 'Mobile Money', value: mobileSales, color: 'text-warning' },
-        ].map(item => (
-          <Card key={item.label}>
-            <CardContent className="pt-5">
-              <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
-              <p className="text-xs font-bold text-muted-foreground mt-1">{item.label}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {isLoading ? (
+          [...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-5 space-y-2">
+                <Skeleton className="h-7 w-24" />
+                <Skeleton className="h-3 w-20 opacity-50" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          [
+            { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, color: 'text-success' },
+            { label: 'Cash', value: cashSales, color: 'text-success' },
+            { label: 'Card', value: cardSales, color: 'text-info' },
+            { label: 'Mobile Money', value: mobileSales, color: 'text-warning' },
+          ].map(item => (
+            <Card key={item.label}>
+              <CardContent className="pt-5">
+                <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
+                <p className="text-xs font-bold text-muted-foreground mt-1">{item.label}</p>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
         <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex items-center gap-2 pb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -84,6 +100,16 @@ export default function SalesPage() {
                 onChange={(e) => setSearchQuery(e.target.value)} 
               />
             </div>
+            <select
+              value={filterMethod}
+              onChange={(e) => setFilterMethod(e.target.value)}
+              className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
+            >
+              <option value="ALL">All Methods</option>
+              <option value="CASH">Cash</option>
+              <option value="CARD">Card</option>
+              <option value="MOBILE_MONEY">Mobile Money</option>
+            </select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -111,7 +137,7 @@ export default function SalesPage() {
                     <th className="px-6 py-4">Method</th>
                     <th className="px-6 py-4">Adjustment</th>
                     <th className="px-6 py-4">Total</th>
-                    <th className="px-6 py-4 text-right">View</th>
+                    <th className="px-6 py-4">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">

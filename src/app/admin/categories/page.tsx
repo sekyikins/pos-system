@@ -11,6 +11,7 @@ import { useToastStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, Package, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 export default function CategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
@@ -20,7 +21,7 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const { addToast } = useToastStore();
 
-  const { data: categories, isLoading, refetch } = useRealtimeTable<Category>({
+  const { data: categories, isLoading, connectionStatus, refetch } = useRealtimeTable<Category>({
     table: 'category',
     initialData: [],
     fetcher: getCategories,
@@ -79,16 +80,26 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-            <Package className="h-8 w-8 text-primary" />
-            Product Categories
-          </h1>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
+              <Package className="h-8 w-8 text-primary" />
+              Product Categories
+            </h1>
           <p className="text-sm text-muted-foreground font-medium">Classify your inventory for better organization</p>
         </div>
-        <Button onClick={() => { setForm({ name: '', description: '' }); setIsAddOpen(true); }} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> Add Category
-        </Button>
+        )}
+        <div className="flex items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <Button onClick={() => { setForm({ name: '', description: '' }); setIsAddOpen(true); }} className="gap-2 shrink-0 h-11 px-6 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
+            <Plus className="h-4 w-4" /> Add Category
+          </Button>
+        </div>
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
@@ -146,7 +157,7 @@ export default function CategoriesPage() {
                         </div>
                       </td>
                       <td className="p-5 text-muted-foreground/80 font-medium">{c.description || <span className="text-xs italic opacity-40">No description provided</span>}</td>
-                      <td className="p-5 text-right">
+                      <td className="p-5 pr-0">
                         <div className="flex justify-around">
                           <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20" onClick={() => handleEditOpen(c)}>
                             <Edit className="h-4.5 w-4.5" />

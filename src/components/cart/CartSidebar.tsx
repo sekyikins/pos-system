@@ -365,7 +365,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                          </div>
                          {variant === 'storefront' && (
                            <div className="font-bold text-lg text-foreground">
-                              ${item.subtotal.toFixed(2)}
+                              {currencySymbol}{item.subtotal.toFixed(2)}
                            </div>
                          )}
                       </div>

@@ -96,8 +96,29 @@ export interface InventoryLog {
   id: string;
   productId: string;
   change: number; // positive or negative
-  reason: 'RESTOCK' | 'SALE' | 'ADJUSTMENT';
+  reason: 'RESTOCK' | 'SALE' | 'ADJUSTMENT' | 'PURCHASE_ORDER';
   timestamp: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplierId: string | null;
+  supplierName?: string;
+  status: 'PENDING' | 'APPROVED' | 'RECEIVED' | 'CANCELLED';
+  totalAmount: number;
+  items?: PurchaseOrderItem[];
+  createdAt: string;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  poId: string;
+  productId: string;
+  productName?: string;
+  quantity: number;
+  unitCost: number;
+  subtotal: number;
+  createdAt: string;
 }
 
 export interface Supplier {
@@ -131,5 +152,15 @@ export interface Promotion {
   startDate?: string;
   endDate?: string;
   usageCount: number;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  expenseDate: string;
+  loggedBy: string | null;
+  loggedByName?: string;
   createdAt: string;
 }

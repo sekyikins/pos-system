@@ -33,13 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (stored) {
         try {
           const parsedUser = JSON.parse(stored) as AuthUser;
-          // UUID is 36 chars; mock IDs were like 'user-1'
-          if (parsedUser.id.length !== 36) {
-            console.warn('Old mock user detected, clearing session.');
-            localStorage.removeItem('pos_user');
-          } else {
-            setUser(parsedUser);
-          }
+          setUser(parsedUser);
         } catch {
           console.error('Failed to parse user from localStorage');
           localStorage.removeItem('pos_user');

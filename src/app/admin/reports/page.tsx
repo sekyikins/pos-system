@@ -5,19 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Sale, Product } from '@/lib/types';
 import { getSales, getProducts } from '@/lib/db';
-import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp, Wifi, WifiOff } from 'lucide-react';
+import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useSettingsStore } from '@/lib/store';
 
 interface ProductStat { name: string; category: string; unitsSold: number; revenue: number; }
 interface DailyStat { date: string; sales: number; revenue: number; }
-
-function ConnBadge({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
-}
 
 export default function ReportsPage() {
   const { currencySymbol } = useSettingsStore();
@@ -88,6 +83,18 @@ export default function ReportsPage() {
     return { dailyStats: stats, maxRevenue: Math.max(...stats.map(d => d.revenue), 1) };
   }, [sales]);
 
+  const promoStats = useMemo(() => {
+    const stats: Record<string, { count: number; totalDiscount: number }> = {};
+    sales.forEach(sale => {
+      if (sale.promoCode && sale.promoCode !== 'null' && sale.promoCode.trim() !== '') {
+        if (!stats[sale.promoCode]) stats[sale.promoCode] = { count: 0, totalDiscount: 0 };
+        stats[sale.promoCode].count++;
+        stats[sale.promoCode].totalDiscount += sale.discount;
+      }
+    });
+    return Object.entries(stats).sort((a, b) => b[1].totalDiscount - a[1].totalDiscount);
+  }, [sales]);
+
   const { categoryStats, maxCat } = useMemo(() => {
     const categoryMap: Record<string, number> = {};
     sales.forEach(sale => {
@@ -101,96 +108,115 @@ export default function ReportsPage() {
     return { categoryStats: stats, maxCat: Math.max(...stats.map(c => c[1]), 1) };
   }, [sales, products]);
 
-  if (isLoading) return (
-    <div className="space-y-6">
-      <Skeleton className="h-10 w-64 mb-6" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i}><CardContent className="pt-5 flex flex-col items-center"><Skeleton className="h-10 w-10 rounded-lg mb-3" /><Skeleton className="h-6 w-24 mb-2" /><Skeleton className="h-3 w-16" /></CardContent></Card>
-        ))}
-      </div>
-      <Card className="h-[400px]">
-        <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-        <CardContent className="flex items-end gap-2 px-6 h-[300px] pb-6">
-          {[60, 45, 80, 55, 90, 40, 70, 85, 50, 65, 75, 55, 45, 95].map((h, i) => (
-            <div key={i} className="flex-1 bg-muted animate-pulse rounded-t-sm" style={{ height: `${h}%` }} />
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports &amp; Analytics</h1>
-          <p className="text-sm text-muted-foreground">Business performance overview</p>
-        </div>
-        <ConnBadge status={connectionStatus} />
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64 opacity-50" />
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Reports &amp; Analytics</h1>
+            <p className="text-sm text-muted-foreground">Business performance overview</p>
+          </div>
+        )}
+        <LiveStatus status={connectionStatus} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
-          { label: 'Total Transactions', value: sales.length, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
-          { label: 'Avg/Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
-          { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
-        ].map(item => (
-          <Card key={item.label}>
-            <CardContent className="pt-5 flex flex-col items-center sm:items-start">
-              <div className={`p-2 rounded-lg mb-3 ${item.bg}`}>
-                <item.icon className={`h-5 w-5 ${item.color}`} />
-              </div>
-              <div className="text-xl sm:text-2xl font-bold">{item.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {isLoading ? (
+          [...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-5 flex flex-col items-center sm:items-start space-y-2">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <Skeleton className="h-7 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          [
+            { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
+            { label: 'Total Transactions', value: sales.length, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
+            { label: 'Avg/Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
+          ].map(item => (
+            <Card key={item.label}>
+              <CardContent className="pt-5 flex flex-col items-center sm:items-start">
+                <div className={`p-2 rounded-lg mb-3 ${item.bg}`}>
+                  <item.icon className={`h-5 w-5 ${item.color}`} />
+                </div>
+                <div className="text-xl sm:text-2xl font-bold">{item.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5" />Daily Revenue — Last 14 Days</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart2 className="h-5 w-5" />
+              Daily Revenue &#8212; Last 14 Days
+            </CardTitle>
           </CardHeader>
           <CardContent className="pb-10 overflow-y-auto">
-            <div className="flex items-end gap-1.5 h-[300px]">
-              {dailyStats.map(d => (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
-                  <div className="relative w-full flex justify-center">
-                    <div title={`${currencySymbol}${d.revenue.toFixed(2)}`}
-                      style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 240)}px` }}
-                      className="w-full bg-primary/70 hover:bg-primary rounded-t-sm transition-all"
-                    />
+            {isLoading ? (
+              <div className="flex items-end gap-1.5 h-[300px]">
+                {[55, 30, 45, 60, 25, 80, 50, 65, 35, 75, 40, 20, 90, 55].map((h, i) => (
+                  <div key={i} className="flex-1 bg-muted animate-pulse rounded-t-sm" style={{ height: `${h}%` }} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-end gap-1.5 h-[300px]">
+                {dailyStats.map(d => (
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
+                    <div className="relative w-full flex justify-center">
+                      <div title={`${currencySymbol}${d.revenue.toFixed(2)}`}
+                        style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 240)}px` }}
+                        className="w-full bg-primary/70 hover:bg-primary rounded-t-sm transition-all"
+                      />
+                    </div>
+                    <span className="text-[9px] text-muted-foreground rotate-45 origin-left mt-1 whitespace-nowrap">
+                      {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
-                  <span className="text-[9px] text-muted-foreground rotate-45 origin-left mt-1 whitespace-nowrap">
-                    {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
+        {/* Other sections handle loading internally or can be simplified too */}
         <Card className='max-h-[850px] overflow-y-hidden'>
           <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Top Products by Revenue</CardTitle></CardHeader>
           <CardContent className='max-h-[780px] overflow-y-auto'>
-            <div className="space-y-3">
-              {productStats.map((p, i) => (
-                <div key={p.name} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-xs text-muted-foreground w-5 shrink-0 font-bold">#{i + 1}</span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.category} · {p.unitsSold} units</p>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {productStats.map((p, i) => (
+                  <div key={p.name} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-xs text-muted-foreground w-5 shrink-0 font-bold">#{i + 1}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.category} &#183; {p.unitsSold} units</p>
+                      </div>
                     </div>
+                    <span className="text-sm font-bold text-success shrink-0">{currencySymbol}{p.revenue.toFixed(2)}</span>
                   </div>
-                  <span className="text-sm font-bold text-success shrink-0">{currencySymbol}{p.revenue.toFixed(2)}</span>
-                </div>
-              ))}
-              {productStats.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No data yet.</p>}
-            </div>
+                ))}
+                {productStats.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No data yet.</p>}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -198,36 +224,75 @@ export default function ReportsPage() {
           <Card className='max-h-[600px] overflow-y-hidden'>
             <CardHeader><CardTitle>Revenue by Category</CardTitle></CardHeader>
             <CardContent className='max-h-[520px] overflow-y-auto'>
-              <div className="space-y-3">
-                {categoryStats.map(([cat, rev]) => (
-                  <div key={cat}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{cat}</span>
-                      <span className="text-muted-foreground">{currencySymbol}{rev.toFixed(2)}</span>
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, i) => <div key={i} className="space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-2 w-full rounded-full" /></div>)}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {categoryStats.map(([cat, rev]) => (
+                    <div key={cat}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium">{cat}</span>
+                        <span className="text-muted-foreground">{currencySymbol}{rev.toFixed(2)}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-primary/70 transition-all" style={{ width: `${(rev / maxCat) * 100}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-primary/70 transition-all" style={{ width: `${(rev / maxCat) * 100}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
+          
           <Card>
             <CardHeader><CardTitle>Payment Method Breakdown</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {Object.entries(paymentBreakdown).map(([method, stat]) => (
-                  <div key={method} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{method.replace('_', ' ')}</p>
-                      <p className="text-xs text-muted-foreground">{stat.count} transactions</p>
+              {isLoading ? (
+                <div className="space-y-4">
+                   {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {Object.entries(paymentBreakdown).map(([method, stat]) => (
+                    <div key={method} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{method.replace('_', ' ')}</p>
+                        <p className="text-xs text-muted-foreground">{stat.count} transactions</p>
+                      </div>
+                      <Badge variant="secondary">{currencySymbol}{stat.total.toFixed(2)}</Badge>
                     </div>
-                    <Badge variant="secondary">{currencySymbol}{stat.total.toFixed(2)}</Badge>
-                  </div>
-                ))}
-                {Object.entries(paymentBreakdown).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No sales data.</p>}
-              </div>
+                  ))}
+                  {Object.entries(paymentBreakdown).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No sales data.</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><ArrowUp className="h-5 w-5"/>Promo Performance</CardTitle></CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-4">
+                   {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[250px] overflow-y-auto">
+                  {promoStats.map(([code, stat]) => (
+                    <div key={code} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
+                      <div>
+                        <p className="text-sm font-bold tracking-tight">{code}</p>
+                        <p className="text-xs text-muted-foreground">{stat.count} times applied</p>
+                      </div>
+                      <span className="text-sm font-bold text-warning">
+                        -{currencySymbol}{stat.totalDiscount.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  {promoStats.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No promos used yet.</p>}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

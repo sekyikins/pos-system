@@ -1,20 +1,21 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { getSales, getProducts } from '@/lib/db';
-import { Sale, Product } from '@/lib/types';
-import { CircleDollarSign, Package, TrendingUp, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
+import { getSales, getProducts, getUsers, getOnlineOrders } from '@/lib/db';
+import { Sale, Product, StaffRecord, OnlineOrder } from '@/lib/types';
+import { CircleDollarSign, Package, TrendingUp, AlertTriangle, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
+import { LiveStatus } from '@/components/ui/LiveStatus';
+import { useSettingsStore } from '@/lib/store';
 
-function ConnectionDot({ status }: { status: ConnectionStatus }) {
-  if (status === 'connected')    return <span className="flex items-center gap-1.5 text-[10px] font-bold text-success"><Wifi className="h-3 w-3" /> Live</span>;
-  if (status === 'error' || status === 'disconnected') return <span className="flex items-center gap-1.5 text-[10px] font-bold text-destructive"><WifiOff className="h-3 w-3" /> Offline</span>;
-  return <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"><span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> Syncing</span>;
-}
+// Standardized LiveStatus used instead
 
 export default function AdminDashboard() {
+  const [cashierFilter, setCashierFilter] = useState<'ALL' | 'ONLINE' | 'INSTORE'>('INSTORE');
+  const { currencySymbol } = useSettingsStore();
+
   const { data: products, isLoading: loadingProducts, connectionStatus: prodStatus } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
@@ -27,7 +28,19 @@ export default function AdminDashboard() {
     fetcher: getSales,
   });
 
-  const isLoading = loadingProducts || loadingSales;
+  const { data: staff, isLoading: loadingStaff } = useRealtimeTable<StaffRecord>({
+    table: 'pos_staff',
+    initialData: [],
+    fetcher: getUsers as unknown as () => Promise<StaffRecord[]>,
+  });
+
+  const { data: onlineOrders, isLoading: loadingOnline } = useRealtimeTable<OnlineOrder>({
+    table: 'online_orders',
+    initialData: [],
+    fetcher: getOnlineOrders,
+  });
+
+  const isLoading = loadingProducts || loadingSales || loadingStaff || loadingOnline;
   const connectionStatus: ConnectionStatus = prodStatus === 'connected' && salesStatus === 'connected' ? 'connected' : prodStatus === 'error' || salesStatus === 'error' ? 'error' : 'connecting';
 
   const stats = useMemo(() => {
@@ -37,7 +50,37 @@ export default function AdminDashboard() {
   }, [products, sales]);
 
   const recentSales = useMemo(() => [...sales].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 6), [sales]);
-  const lowStockProducts = useMemo(() => products.filter(p => p.quantity < 10).slice(0, 6), [products]);
+  
+  const cashierStats = useMemo(() => {
+    const stats: Record<string, { id: string, name: string, count: number, revenue: number }> = {};
+    
+    // Process POS Sales
+    if (cashierFilter === 'ALL' || cashierFilter === 'INSTORE') {
+      sales.forEach(s => {
+        if (!stats[s.cashierId]) stats[s.cashierId] = { id: s.cashierId, name: 'Unknown', count: 0, revenue: 0 };
+        stats[s.cashierId].count++;
+        stats[s.cashierId].revenue += s.finalAmount;
+      });
+    }
+
+    // Process Online Orders
+    if (cashierFilter === 'ALL' || cashierFilter === 'ONLINE') {
+      onlineOrders.forEach(o => {
+        if (o.processingStaffId && (o.status === 'DELIVERED' || o.status === 'SHIPPED' || o.status === 'CONFIRMED')) {
+          if (!stats[o.processingStaffId]) stats[o.processingStaffId] = { id: o.processingStaffId, name: 'Unknown', count: 0, revenue: 0 };
+          stats[o.processingStaffId].count++;
+          stats[o.processingStaffId].revenue += o.totalAmount;
+        }
+      });
+    }
+
+    // Resolve Names
+    staff.forEach(user => {
+      if (stats[user.id]) stats[user.id].name = user.name || user.username;
+    });
+
+    return Object.values(stats).sort((a, b) => b.revenue - a.revenue);
+  }, [sales, onlineOrders, staff, cashierFilter]);
 
   if (isLoading) return (
     <div className="space-y-6">
@@ -72,7 +115,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
-        <ConnectionDot status={connectionStatus} />
+        <LiveStatus status={connectionStatus} />
       </div>
 
       {/* Stat Cards */}
@@ -83,7 +126,7 @@ export default function AdminDashboard() {
             <CircleDollarSign className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{currencySymbol}{stats.totalRevenue.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">All time sales</p>
           </CardContent>
         </Card>
@@ -141,7 +184,7 @@ export default function AdminDashboard() {
                         {new Date(sale.timestamp).toLocaleString()} · {sale.items.length} items · <span className="font-medium text-foreground">{sale.paymentMethod.replace('_', ' ')}</span>
                       </p>
                     </div>
-                    <div className="font-bold text-success">+${sale.finalAmount.toFixed(2)}</div>
+                    <div className="font-bold text-success">+{currencySymbol}{sale.finalAmount.toFixed(2)}</div>
                   </div>
                 ))}
               </div>
@@ -149,26 +192,45 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Stock */}
+        {/* Cashier Performance */}
         <Card className='max-h-[460px] overflow-y-hidden'>
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" /> Low Stock Items
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-primary flex items-center gap-2">
+              <Users className="h-4 w-4" /> Cashier Performance
             </CardTitle>
+            <div className="relative shrink-0">
+              <select
+                value={cashierFilter}
+                onChange={(e) => setCashierFilter(e.target.value as 'ALL' | 'ONLINE' | 'INSTORE')}
+                className="px-3 pr-8 h-8 text-xs rounded-lg border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer shadow-sm"
+              >
+                <option value="ALL">All</option>
+                <option value="INSTORE">In-Store</option>
+                <option value="ONLINE">Online</option>
+              </select>
+              <div className="absolute right-2 top-2.5 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className='max-h-[400px] overflow-y-auto'>
-            {lowStockProducts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">All products are well stocked.</p>
+            {cashierStats.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No performance data yet.</p>
             ) : (
-              <div className="space-y-3">
-                {lowStockProducts.map((p: Product) => (
-                  <div key={p.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.category}</p>
+              <div className="space-y-4">
+                {cashierStats.map((stat, i) => (
+                  <div key={stat.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0 gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                        {i + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{stat.name}</p>
+                        <p className="text-xs text-muted-foreground">{stat.count} customers served</p>
+                      </div>
                     </div>
-                    <span className={`text-sm font-bold ${p.quantity === 0 ? 'text-destructive' : 'text-warning'}`}>
-                      {p.quantity === 0 ? 'OUT OF STOCK' : `${p.quantity} left`}
+                    <span className="text-sm font-bold text-success sm:text-right">
+                      {currencySymbol}{stat.revenue.toFixed(2)}
                     </span>
                   </div>
                 ))}
