@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { OnlineOrder, DeliveryPoint } from '@/lib/types';
 import { getOnlineOrders, updateOnlineOrderStatus, getDeliveryPoints } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Search, ShoppingBag, Eye } from 'lucide-react';
+import { Search, ShoppingBag, Eye, TrendingUp, Truck } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
@@ -46,6 +46,7 @@ export default function OnlineOrdersPage() {
     refetchOnChange: true, // orders have joins + camelCase mapper
   });
 
+
   const filtered = useMemo(() =>
     orders.filter(o => {
       const matchSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -54,6 +55,9 @@ export default function OnlineOrdersPage() {
       const matchStatus = filterStatus === 'ALL' || o.status === filterStatus;
       return matchSearch && matchStatus;
     }), [orders, searchQuery, filterStatus]);
+
+  const filteredRevenue = filtered.reduce((acc, o) => acc + o.totalAmount, 0);
+  const filteredCount = filtered.length;
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setIsUpdating(true);
@@ -79,6 +83,52 @@ export default function OnlineOrdersPage() {
           <p className="text-sm text-muted-foreground">Manage E-commerce storefront orders</p>
         </div>
         <LiveStatus status={connectionStatus} />
+      </div>
+
+      {/* Dynamic Summary Stats - Compact */}
+      <div className="grid grid-cols-2 gap-4">
+        {isLoading ? (
+          [...Array(2)].map((_, i) => (
+            <Card key={i} className="border-2 border-border/50 shadow-sm">
+              <CardContent className="py-4 flex flex-col items-center justify-center space-y-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-3 w-16 opacity-50" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <>
+            <Card className="border-2 border-primary/20 bg-primary/5 shadow-sm overflow-hidden group hover:border-primary/40 transition-all">
+              <CardContent className="py-4 flex flex-col items-center justify-center relative">
+                <div className="absolute right-2 top-2 text-primary opacity-5">
+                   <ShoppingBag className="h-10 w-10" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold text-primary tracking-tighter tabular-nums drop-shadow-sm">
+                  {currencySymbol}{filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <TrendingUp className="h-3 w-3 text-primary/60" />
+                  {filterStatus === 'ALL' ? 'Total Revenue' : `${filterStatus}`}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-info/20 bg-info/5 shadow-sm overflow-hidden group hover:border-info/40 transition-all">
+              <CardContent className="py-4 flex flex-col items-center justify-center relative">
+                <div className="absolute right-2 top-2 text-info opacity-5">
+                   <Truck className="h-10 w-10" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold text-info tracking-tighter tabular-nums drop-shadow-sm">
+                  {filteredCount}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <ShoppingBag className="h-3 w-3 text-info/60" />
+                  {filterStatus === 'ALL' ? 'Total Orders' : 'Count'}
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       <Card>

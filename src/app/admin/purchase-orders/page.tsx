@@ -181,7 +181,6 @@ export default function PurchaseOrdersPage() {
                       <Skeleton className="h-3 w-1/6" />
                     </div>
                     <Skeleton className="h-6 w-24 rounded-full" />
-                    <Skeleton className="h-8 w-8 rounded-lg ml-auto" />
                   </div>
                 ))}
               </div>
@@ -194,7 +193,6 @@ export default function PurchaseOrdersPage() {
                       <th className="p-5 text-left">Supplier</th>
                       <th className="p-5 text-left">Status</th>
                       <th className="p-5 text-right">Total Amount</th>
-                      <th className="p-5 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
@@ -231,13 +229,6 @@ export default function PurchaseOrdersPage() {
                           </td>
                           <td className="p-5 text-right font-bold text-base text-primary">
                             {currencySymbol}{po.totalAmount.toFixed(2)}
-                          </td>
-                          <td className="p-5">
-                            <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
-                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg group-hover:bg-primary group-hover:text-white transition-all">
-                                 <ChevronRight className="h-4 w-4" />
-                               </Button>
-                            </div>
                           </td>
                         </tr>
                       ))

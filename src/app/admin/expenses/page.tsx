@@ -108,7 +108,7 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 gap-6">
         <Card className="bg-primary/5 border-primary/20 shadow-none overflow-hidden">
            <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary/70 flex items-center gap-2">
@@ -119,7 +119,7 @@ export default function ExpensesPage() {
               {isLoading ? (
                 <Skeleton className="h-9 w-24" />
               ) : (
-                <div className="text-3xl font-bold text-primary">{currencySymbol}{totalExpenses.toFixed(2)}</div>
+                <div className="text-xl font-bold text-primary">{currencySymbol}{totalExpenses.toFixed(2)}</div>
               )}
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Based on visible filters</p>
            </CardContent>
@@ -135,7 +135,7 @@ export default function ExpensesPage() {
               {isLoading ? (
                 <Skeleton className="h-9 w-24" />
               ) : (
-                <div className="text-3xl font-bold text-warning">
+                <div className="text-xl font-bold text-warning">
                   {currencySymbol}{(filteredExpenses.length ? totalExpenses / filteredExpenses.length : 0).toFixed(2)}
                 </div>
               )}

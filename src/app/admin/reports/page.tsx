@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Sale, Product } from '@/lib/types';
 import { getSales, getProducts } from '@/lib/db';
+import { getStorefrontSales } from '@/lib/db_extended';
 import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
@@ -16,11 +17,19 @@ interface DailyStat { date: string; sales: number; revenue: number; }
 
 export default function ReportsPage() {
   const { currencySymbol } = useSettingsStore();
+  const [reportSource, setReportSource] = React.useState<'IN-STORE' | 'STOREFRONT'>('IN-STORE');
 
-  const { data: sales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
+  const { data: posSales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
     table: 'sales',
     initialData: [],
     fetcher: getSales,
+    refetchOnChange: true
+  });
+
+  const { data: onlineSales, isLoading: loadingOnline, connectionStatus: onlineStatus } = useRealtimeTable<Sale>({
+    table: 'online_orders',
+    initialData: [],
+    fetcher: getStorefrontSales,
     refetchOnChange: true
   });
 
@@ -31,10 +40,12 @@ export default function ReportsPage() {
     refetchOnChange: true
   });
 
-  const isLoading = loadingSales || loadingProducts;
+  const sales = useMemo(() => reportSource === 'IN-STORE' ? posSales : onlineSales, [reportSource, posSales, onlineSales]);
+
+  const isLoading = loadingSales || loadingProducts || loadingOnline;
   const connectionStatus: ConnectionStatus =
-    salesStatus === 'connected' && productsStatus === 'connected' ? 'connected' :
-    salesStatus === 'error' || productsStatus === 'error' ? 'error' : 'connecting';
+    salesStatus === 'connected' && productsStatus === 'connected' && onlineStatus === 'connected' ? 'connected' :
+    salesStatus === 'error' || productsStatus === 'error' || onlineStatus === 'error' ? 'error' : 'connecting';
 
   // ─── Compute stats (memoized) ────────────────────────────────────
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.finalAmount, 0), [sales]);
@@ -111,7 +122,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-48" />
@@ -123,7 +134,17 @@ export default function ReportsPage() {
             <p className="text-sm text-muted-foreground">Business performance overview</p>
           </div>
         )}
-        <LiveStatus status={connectionStatus} />
+        <div className="flex justify-end items-center gap-4">
+          <LiveStatus status={connectionStatus} />
+          <select
+            value={reportSource}
+            onChange={(e) => setReportSource(e.target.value as 'IN-STORE' | 'STOREFRONT')}
+            className="ml-4 h-11 px-6 text-sm font-bold rounded-xl border border-border bg-muted/20 text-foreground hover:bg-muted/30 transition-all appearance-none cursor-pointer shadow-sm focus:outline-none focus:border-primary"
+          >
+            <option value="IN-STORE">In-Store Analysis</option>
+            <option value="STOREFRONT">Storefront Analysis</option>
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

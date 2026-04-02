@@ -155,7 +155,7 @@ export default function CustomersPage() {
                       <User className="h-6 w-6" />
                    </div>
                    <div>
-                      <p className="text-sm font-bold text-muted-foreground">Total Database</p>
+                      <p className="text-sm font-bold text-muted-foreground">Total Customers</p>
                       <p className="text-2xl font-bold">{customers.length}</p>
                    </div>
                 </div>
@@ -181,7 +181,7 @@ export default function CustomersPage() {
                       <Store className="h-6 w-6" />
                    </div>
                    <div>
-                      <p className="text-sm font-bold text-muted-foreground">POS Customers</p>
+                      <p className="text-sm font-bold text-muted-foreground">In-Store Customers</p>
                       <p className="text-2xl font-bold">{customers.filter(c => c.type === 'POS').length}</p>
                    </div>
                 </div>

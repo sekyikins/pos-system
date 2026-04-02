@@ -13,6 +13,7 @@ import { useSettingsStore } from '@/lib/store';
 
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
+import { TrendingUp } from 'lucide-react';
 
 const METHOD_ICON = { CASH: Banknote, CARD: CreditCard, MOBILE_MONEY: Smartphone };
 const METHOD_COLOR = { CASH: 'text-success', CARD: 'text-info', MOBILE_MONEY: 'text-warning' };
@@ -42,10 +43,8 @@ export default function SalesPage() {
     setSelectedSale(sale);
   };
 
-  const totalRevenue = sales.reduce((s, sale) => s + sale.finalAmount, 0);
-  const cashSales = sales.filter(s => s.paymentMethod === 'CASH').length;
-  const cardSales = sales.filter(s => s.paymentMethod === 'CARD').length;
-  const mobileSales = sales.filter(s => s.paymentMethod === 'MOBILE_MONEY').length;
+  const filteredRevenue = filtered.reduce((s, sale) => s + sale.finalAmount, 0);
+  const filteredCount = filtered.length;
 
   return (
     <div className="space-y-6">
@@ -60,31 +59,49 @@ export default function SalesPage() {
         <LiveStatus status={connectionStatus} />
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Dynamic Summary Stats - Compact */}
+      <div className="grid grid-cols-2 gap-4">
         {isLoading ? (
-          [...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="pt-5 space-y-2">
-                <Skeleton className="h-7 w-24" />
-                <Skeleton className="h-3 w-20 opacity-50" />
+          [...Array(2)].map((_, i) => (
+            <Card key={i} className="border-2 border-border/50 shadow-sm">
+              <CardContent className="py-4 flex flex-col items-center justify-center space-y-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-3 w-16 opacity-50" />
               </CardContent>
             </Card>
           ))
         ) : (
-          [
-            { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, color: 'text-success' },
-            { label: 'Cash', value: cashSales, color: 'text-success' },
-            { label: 'Card', value: cardSales, color: 'text-info' },
-            { label: 'Mobile Money', value: mobileSales, color: 'text-warning' },
-          ].map(item => (
-            <Card key={item.label}>
-              <CardContent className="pt-5">
-                <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
-                <p className="text-xs font-bold text-muted-foreground mt-1">{item.label}</p>
+          <>
+            <Card className="border-2 border-primary/20 bg-primary/5 shadow-sm overflow-hidden group hover:border-primary/40 transition-all">
+              <CardContent className="py-4 flex flex-col items-center justify-center relative">
+                <div className="absolute right-2 top-2 text-primary opacity-5">
+                   <Banknote className="h-10 w-10" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold text-primary tracking-tighter tabular-nums drop-shadow-sm">
+                  {currencySymbol}{filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <TrendingUp className="h-3 w-3 text-primary/60" />
+                  {filterMethod === 'ALL' ? 'Total Revenue' : `${filterMethod.replace('_', ' ')}`}
+                </p>
               </CardContent>
             </Card>
-          ))
+
+            <Card className="border-2 border-info/20 bg-info/5 shadow-sm overflow-hidden group hover:border-info/40 transition-all">
+              <CardContent className="py-4 flex flex-col items-center justify-center relative">
+                <div className="absolute right-2 top-2 text-info opacity-5">
+                   <ShoppingBag className="h-10 w-10" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold text-info tracking-tighter tabular-nums drop-shadow-sm">
+                  {filteredCount}
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <ShoppingBag className="h-3 w-3 text-info/60" />
+                  {filterMethod === 'ALL' ? 'Total Sales' : 'Count'}
+                </p>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
 

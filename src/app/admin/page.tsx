@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { getSales, getProducts, getUsers, getOnlineOrders } from '@/lib/db';
 import { Sale, Product, StaffRecord, OnlineOrder } from '@/lib/types';
-import { CircleDollarSign, Package, TrendingUp, AlertTriangle, Users } from 'lucide-react';
+import { CircleDollarSign, Package, TrendingUp, AlertTriangle, Users, Monitor, Store, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
@@ -44,12 +45,38 @@ export default function AdminDashboard() {
   const connectionStatus: ConnectionStatus = prodStatus === 'connected' && salesStatus === 'connected' ? 'connected' : prodStatus === 'error' || salesStatus === 'error' ? 'error' : 'connecting';
 
   const stats = useMemo(() => {
-    const revenue = sales.reduce((acc, s) => acc + s.finalAmount, 0);
+    const posRevenue = sales.reduce((acc, s) => acc + s.finalAmount, 0);
+    const onlineRevenue = onlineOrders.reduce((acc, o) => acc + o.totalAmount, 0);
     const lowStock = products.filter(p => p.quantity < 10);
-    return { totalSales: sales.length, totalRevenue: revenue, totalProducts: products.length, lowStock: lowStock.length };
-  }, [products, sales]);
+    return { 
+      totalSales: sales.length + onlineOrders.length, 
+      totalRevenue: posRevenue + onlineRevenue, 
+      totalProducts: products.length, 
+      lowStock: lowStock.length 
+    };
+  }, [products, sales, onlineOrders]);
 
-  const recentSales = useMemo(() => [...sales].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 6), [sales]);
+  const recentSales = useMemo(() => {
+    const instore = sales.map(s => ({
+      id: s.id,
+      timestamp: s.timestamp,
+      finalAmount: s.finalAmount,
+      itemsCount: s.items.length,
+      paymentMethod: s.paymentMethod,
+      type: 'IN-STORE' as const
+    }));
+    
+    const online = onlineOrders.map(o => ({
+      id: o.id,
+      timestamp: o.createdAt,
+      finalAmount: o.totalAmount,
+      itemsCount: 0,
+      paymentMethod: o.paymentMethod,
+      type: 'ONLINE' as const
+    }));
+
+    return [...instore, ...online].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [sales, onlineOrders]);
   
   const cashierStats = useMemo(() => {
     const stats: Record<string, { id: string, name: string, count: number, revenue: number }> = {};
@@ -169,22 +196,57 @@ export default function AdminDashboard() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Recent Sales */}
-        <Card className='max-h-[460px] overflow-y-hidden'>
-          <CardHeader><CardTitle>Recent Sales</CardTitle></CardHeader>
-          <CardContent className='max-h-[400px] overflow-y-auto'>
+        <Card className='max-h-[60vh] overflow-y-hidden border-2 border-border/50'>
+          <CardHeader className="border-b border-border/50 pb-4">
+             <CardTitle className="flex items-center justify-between">
+                <span>Unified Sales Feed</span>
+                <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded-lg uppercase tracking-wider">{recentSales.length} Total</span>
+             </CardTitle>
+          </CardHeader>
+          <CardContent className='max-h-[49vh] overflow-y-auto p-0'>
             {recentSales.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No sales recorded yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">No sales recorded yet.</p>
             ) : (
-              <div className="space-y-4">
-                {recentSales.map((sale: Sale) => (
-                  <div key={sale.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium leading-none">Order #{sale.id.slice(-6)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(sale.timestamp).toLocaleString()} · {sale.items.length} items · <span className="font-medium text-foreground">{sale.paymentMethod.replace('_', ' ')}</span>
-                      </p>
+              <div className="divide-y divide-border">
+                {recentSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center gap-4 p-4 hover:bg-primary/5 transition-all group border-b border-border/40 last:border-0">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-110 ${
+                      sale.type === 'ONLINE' 
+                        ? 'bg-info/10 text-info border-info/20' 
+                        : 'bg-success/10 text-success border-success/20'
+                    }`}>
+                      {sale.type === 'ONLINE' ? <Monitor className="h-5 w-5" /> : <Store className="h-5 w-5" />}
                     </div>
-                    <div className="font-bold text-success">+{currencySymbol}{sale.finalAmount.toFixed(2)}</div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold truncate tracking-tight">#{sale.id.slice(-6).toUpperCase()}</p>
+                        <Badge variant="outline" className={`text-[9px] font-bold px-1.5 py-0 h-4 border-transparent uppercase tracking-tighter ${
+                          sale.type === 'ONLINE' ? 'bg-info/10 text-info' : 'bg-success/10 text-success'
+                        }`}>
+                          {sale.type}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium mt-0.5">
+                        <Clock className="h-3 w-3 opacity-50" />
+                        <span>{new Date(sale.timestamp).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        {sale.type === 'IN-STORE' && (
+                          <>
+                            <span className="h-1 w-1 rounded-full bg-border" />
+                            <span>{sale.itemsCount} {sale.itemsCount === 1 ? 'item' : 'items'}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5">
+                       <div className="font-bold text-base text-success tabular-nums">
+                          +{currencySymbol}{sale.finalAmount.toFixed(2)}
+                       </div>
+                       <div className="bg-muted/30 px-2 py-0.5 rounded text-[9px] font-bold text-muted-foreground uppercase tracking-widest border border-border">
+                          {sale.paymentMethod.replace('_', ' ')}
+                       </div>
+                    </div>
                   </div>
                 ))}
               </div>

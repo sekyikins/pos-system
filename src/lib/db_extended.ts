@@ -3,7 +3,7 @@ export * from './db';
 
 import { supabase } from './supabase';
 import { adjustInventory } from './db';
-import { Category, DeliveryPoint, OnlineOrder, Expense, PurchaseOrder, PurchaseOrderItem } from './types';
+import { Sale, OnlineOrder, Category, DeliveryPoint, Expense, PurchaseOrder, PurchaseOrderItem } from './types';
 
 export async function getCategories(): Promise<Category[]> {
   const { data, error } = await supabase.from('categories').select('*').order('name');
@@ -88,6 +88,32 @@ export async function updateOnlineOrderStatus(id: string, status: string, staffI
   }
   const { error } = await supabase.from('online_orders').update(updates).eq('id', id);
   if (error) throw error;
+}
+
+export async function getStorefrontSales(): Promise<Sale[]> {
+  const { data, error } = await supabase
+    .from('online_orders')
+    .select('*, online_order_items(*)')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  
+  return (data || []).map(order => ({
+    id: order.id,
+    cashierId: order.processing_staff_id || 'ONLINE',
+    totalAmount: Number(order.total_amount),
+    discount: 0, 
+    finalAmount: Number(order.total_amount),
+    paymentMethod: (order.payment_method === 'PAY_ON_DELIVERY' ? 'CASH' : order.payment_method) as Sale['paymentMethod'],
+    timestamp: order.created_at,
+    items: (order.online_order_items || []).map((item: { id: string; product_id: string; product_name: string; price: string | number; quantity: number; subtotal: string | number }) => ({
+      id: item.id,
+      productId: item.product_id,
+      productName: item.product_name,
+      price: Number(item.price),
+      quantity: item.quantity,
+      subtotal: Number(item.subtotal)
+    }))
+  }));
 }
 
 // ─── Suppliers ─────────────────────────────────────────────────────────────
