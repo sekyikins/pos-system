@@ -81,14 +81,14 @@ export default function POSPage() {
           <div className="flex bg-muted/30 p-1 rounded-2xl w-full sm:w-auto">
              <button
                onClick={() => setView('POS')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
              >
                <ShoppingCart className="h-4 w-4" />
                Checkout
              </button>
              <button
                onClick={() => setView('ONLINE')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
              >
                <ShoppingBag className="h-4 w-4" />
                Online Orders

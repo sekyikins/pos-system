@@ -68,7 +68,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, searchQuery,
           <button 
             onClick={() => onAddToCart(product)}
             disabled={product.quantity <= 0}
-            className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-semibold py-2.5 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:hover:bg-primary/10 disabled:hover:text-primary disabled:cursor-not-allowed text-sm"
+            className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-semibold py-2.5 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:hover:bg-primary/10 disabled:hover:text-primary disabled:cursor-not-allowed hover:cursor-pointer text-sm"
           >
             <Plus className="h-4 w-4 shrink-0" /> Add to Cart
           </button>

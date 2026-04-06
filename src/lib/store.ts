@@ -95,7 +95,7 @@ export const useToastStore = create<ToastState>((set) => ({
 // Global Application Settings Store
 import { getStoreSettings } from './db_extended';
 
-interface SettingsState {
+export interface SettingsState {
   storeName: string;
   currency: string;
   currencySymbol: string;
@@ -106,14 +106,12 @@ interface SettingsState {
   refreshSettings: () => Promise<void>;
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', GBP: '£', GHS: 'GH₵', NGN: '₦', KES: 'KSh', ZAR: 'R', JPY: '¥', CNY: '¥', INR: '₹', CAD: 'C$', AUD: 'A$'
-};
+
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  storeName: 'My Store',
-  currency: 'USD',
-  currencySymbol: '$',
+  storeName: '',
+  currency: 'GHS',
+  currencySymbol: '₵',
   taxRate: 0,
   receiptHeader: null,
   receiptFooter: null,
@@ -124,14 +122,13 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       set({
         storeName: s.storeName,
         currency: s.currency,
-        currencySymbol: CURRENCY_SYMBOLS[s.currency] || s.currency,
+        currencySymbol: s.currencySymbol,
         taxRate: s.taxRate,
         receiptHeader: s.receiptHeader,
         receiptFooter: s.receiptFooter,
         initialized: true
       });
     } catch {
-      // Keep defaults if failed
       set({ initialized: true });
     }
   }

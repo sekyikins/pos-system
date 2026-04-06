@@ -18,6 +18,8 @@ interface DailyStat { date: string; sales: number; revenue: number; }
 export default function ReportsPage() {
   const { currencySymbol } = useSettingsStore();
   const [reportSource, setReportSource] = React.useState<'IN-STORE' | 'STOREFRONT'>('IN-STORE');
+  const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
+  const [paymentFilter, setPaymentFilter] = React.useState<string>('ALL');
 
   const { data: posSales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
     table: 'sales',
@@ -40,7 +42,21 @@ export default function ReportsPage() {
     refetchOnChange: true
   });
 
-  const sales = useMemo(() => reportSource === 'IN-STORE' ? posSales : onlineSales, [reportSource, posSales, onlineSales]);
+  const sales = useMemo(() => {
+    let data = reportSource === 'IN-STORE' ? posSales : onlineSales;
+    
+    if (statusFilter !== 'ALL') {
+      data = data.filter(s => {
+        const st = s.status || 'COMPLETED';
+        return st === statusFilter;
+      });
+    }
+    
+    if (paymentFilter !== 'ALL') {
+       data = data.filter(s => s.paymentMethod === paymentFilter);
+    }
+    return data;
+  }, [reportSource, posSales, onlineSales, statusFilter, paymentFilter]);
 
   const isLoading = loadingSales || loadingProducts || loadingOnline;
   const connectionStatus: ConnectionStatus =
@@ -134,16 +150,45 @@ export default function ReportsPage() {
             <p className="text-sm text-muted-foreground">Business performance overview</p>
           </div>
         )}
-        <div className="flex justify-end items-center gap-4">
+        <div className="flex justify-end items-center gap-4 flex-wrap">
           <LiveStatus status={connectionStatus} />
-          <select
-            value={reportSource}
-            onChange={(e) => setReportSource(e.target.value as 'IN-STORE' | 'STOREFRONT')}
-            className="ml-4 h-11 px-6 text-sm font-bold rounded-xl border border-border bg-muted/20 text-foreground hover:bg-muted/30 transition-all appearance-none cursor-pointer shadow-sm focus:outline-none focus:border-primary"
-          >
-            <option value="IN-STORE">In-Store Analysis</option>
-            <option value="STOREFRONT">Storefront Analysis</option>
-          </select>
+          <div className="flex gap-2 ml-4">
+            {reportSource === 'STOREFRONT' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-all appearance-none cursor-pointer focus:outline-none focus:border-primary shadow-sm"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            )}
+            <select
+              value={paymentFilter}
+              onChange={(e) => setPaymentFilter(e.target.value)}
+              className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-all appearance-none cursor-pointer focus:outline-none focus:border-primary shadow-sm"
+            >
+              <option value="ALL">All Methods</option>
+              <option value="CARD">Card</option>
+              <option value="CASH">Cash & Delivery</option>
+              <option value="MOBILE_MONEY">Mobile Money</option>
+            </select>
+            <select
+              value={reportSource}
+              onChange={(e) => {
+                 setReportSource(e.target.value as 'IN-STORE' | 'STOREFRONT');
+                 if (e.target.value === 'IN-STORE') setStatusFilter('ALL');
+              }}
+              className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-muted/20 text-foreground hover:bg-muted/30 transition-all appearance-none cursor-pointer shadow-sm focus:outline-none focus:border-primary"
+            >
+              <option value="IN-STORE">In-Store Analysis</option>
+              <option value="STOREFRONT">Storefront Analysis</option>
+            </select>
+          </div>
         </div>
       </div>
 

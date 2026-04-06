@@ -385,7 +385,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                 <select
                   value={selectedPromoId || ''}
                   onChange={e => setSelectedPromoId(e.target.value || null)}
-                  className="w-full h-9 px-2 text-xs font-bold rounded-xl border border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                  className="w-full h-9 px-2 text-xs font-bold rounded-xl border hover:cursor-pointer border-border bg-card focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
                 >
                   <option value="">Apply Promotion...</option>
                   {promotions.filter(p => p.isActive).map(p => (
@@ -397,7 +397,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                 </select>
               </div>
               {selectedPromoId && (
-                <button onClick={() => setSelectedPromoId(null)} className="p-1 hover:bg-destructive/10 text-destructive rounded-full">
+                <button onClick={() => setSelectedPromoId(null)} className="p-1 hover:bg-destructive/10 text-destructive rounded-full hover:cursor-pointer">
                   <X className="h-4 w-4" />
                 </button>
               )}

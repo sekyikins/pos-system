@@ -26,7 +26,7 @@ const STATUS_BADGE: Record<string, { label: string; class: string }> = {
 export default function OnlineOrdersPage() {
   const [deliveryPoints, setDeliveryPoints] = useState<Record<string, DeliveryPoint>>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('DELIVERED');
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
   const [selectedOrder, setSelectedOrder] = useState<OnlineOrder | null>(null);
@@ -108,7 +108,7 @@ export default function OnlineOrdersPage() {
                 </div>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
                   <TrendingUp className="h-3 w-3 text-primary/60" />
-                  {filterStatus === 'ALL' ? 'Total Revenue' : `${filterStatus}`}
+                  {filterStatus === 'ALL' ? 'Expected Revenue' : `${filterStatus}`}
                 </p>
               </CardContent>
             </Card>
@@ -205,7 +205,7 @@ export default function OnlineOrdersPage() {
                         </td>
                         <td className="p-5 text-right">
                           <Button variant="ghost" size="sm" onClick={() => { setSelectedOrder(o); setIsViewOpen(true); }}>
-                            <Eye className="h-4 w-4 mr-2" />
+                            <Eye className="h-4 w-4 mx-1" />
                           </Button>
                         </td>
                       </tr>
@@ -253,7 +253,7 @@ export default function OnlineOrdersPage() {
               </select>
             </div>
             <div className="flex justify-end pt-4 border-t border-border mt-6">
-              <Button variant="outline" onClick={() => setIsViewOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setIsViewOpen(false)}>Confirm</Button>
             </div>
           </div>
         )}

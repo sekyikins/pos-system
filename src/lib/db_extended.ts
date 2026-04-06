@@ -97,23 +97,30 @@ export async function getStorefrontSales(): Promise<Sale[]> {
     .order('created_at', { ascending: false });
   if (error) throw error;
   
-  return (data || []).map(order => ({
-    id: order.id,
-    cashierId: order.processing_staff_id || 'ONLINE',
-    totalAmount: Number(order.total_amount),
-    discount: 0, 
-    finalAmount: Number(order.total_amount),
-    paymentMethod: (order.payment_method === 'PAY_ON_DELIVERY' ? 'CASH' : order.payment_method) as Sale['paymentMethod'],
-    timestamp: order.created_at,
-    items: (order.online_order_items || []).map((item: { id: string; product_id: string; product_name: string; price: string | number; quantity: number; subtotal: string | number }) => ({
-      id: item.id,
-      productId: item.product_id,
-      productName: item.product_name,
-      price: Number(item.price),
-      quantity: item.quantity,
-      subtotal: Number(item.subtotal)
-    }))
-  }));
+  return (data || []).map(order => {
+    const rawSubtotal = (order.online_order_items || []).reduce((sum: number, item: { subtotal: string | number }) => sum + Number(item.subtotal), 0);
+    const calculatedDiscount = Math.max(0, rawSubtotal - Number(order.total_amount));
+    
+    return {
+      id: order.id,
+      cashierId: order.processing_staff_id || 'ONLINE',
+      totalAmount: rawSubtotal,
+      discount: calculatedDiscount, 
+      finalAmount: Number(order.total_amount),
+      paymentMethod: (order.payment_method === 'PAY_ON_DELIVERY' ? 'CASH' : order.payment_method) as Sale['paymentMethod'],
+      promoCode: order.promo_name || undefined,
+      status: order.status,
+      timestamp: order.created_at,
+      items: (order.online_order_items || []).map((item: { id: string; product_id: string; product_name: string; price: string | number; quantity: number; subtotal: string | number }) => ({
+        id: item.id,
+        productId: item.product_id,
+        productName: item.product_name,
+        price: Number(item.price),
+        quantity: item.quantity,
+        subtotal: Number(item.subtotal)
+      }))
+    };
+  });
 }
 
 // ─── Suppliers ─────────────────────────────────────────────────────────────
@@ -170,7 +177,9 @@ export async function deleteSupplier(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// ─── Store Settings ─────────────────────────────────────────────────────────
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', GHS: '₵', NGN: '₦', KES: 'KSh', ZAR: 'R', JPY: '¥', CNY: '¥', INR: '₹', CAD: 'C$', AUD: 'A$'
+};
 
 export async function getStoreSettings(): Promise<StoreSettings> {
   const { data, error } = await supabase.from('store_settings').select('*').limit(1).single();
@@ -179,7 +188,8 @@ export async function getStoreSettings(): Promise<StoreSettings> {
     return {
       id: 'default',
       storeName: 'My Store',
-      currency: 'USD',
+      currency: 'GHS',
+      currencySymbol: '₵',
       taxRate: 0,
       receiptHeader: null,
       receiptFooter: null,
@@ -190,6 +200,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
     id: data.id,
     storeName: data.store_name,
     currency: data.currency,
+    currencySymbol: data.currency_symbol || CURRENCY_SYMBOLS[data.currency as string] || '$',
     taxRate: Number(data.tax_rate),
     receiptHeader: data.receipt_header,
     receiptFooter: data.receipt_footer,
@@ -198,14 +209,29 @@ export async function getStoreSettings(): Promise<StoreSettings> {
 }
 
 export async function updateStoreSettings(id: string, s: Partial<StoreSettings>): Promise<void> {
-  const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (s.storeName) row.store_name = s.storeName;
-  if (s.currency) row.currency = s.currency;
+  const row: Record<string, unknown> = {
+    updated_at: new Date().toISOString()
+  };
+  
+  // Only include defined fields
+  if (s.storeName !== undefined) row.store_name = s.storeName;
+  if (s.currency !== undefined) {
+    row.currency = s.currency;
+    // Map the symbol if not provided, or if the update only includes the currency code
+    row.currency_symbol = s.currencySymbol || CURRENCY_SYMBOLS[s.currency] || '$';
+  } else if (s.currencySymbol !== undefined) {
+    row.currency_symbol = s.currencySymbol;
+  }
+  
   if (s.taxRate !== undefined) row.tax_rate = s.taxRate;
   if (s.receiptHeader !== undefined) row.receipt_header = s.receiptHeader;
   if (s.receiptFooter !== undefined) row.receipt_footer = s.receiptFooter;
 
-  const { error } = await supabase.from('store_settings').update(row).eq('id', id);
+  // Use upsert to handle the case where settings haven't been created yet
+  // If id is 'default', we remove it to allow Supabase to generate a UUID
+  const upsertData = id === 'default' ? row : { ...row, id };
+  
+  const { error } = await supabase.from('store_settings').upsert(upsertData);
   if (error) throw error;
 }
 

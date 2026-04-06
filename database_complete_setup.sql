@@ -10,6 +10,7 @@ DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO public;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 SET search_path = public;
 
@@ -23,7 +24,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 1.1 Categories
 CREATE TABLE public.categories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
@@ -31,9 +32,10 @@ CREATE TABLE public.categories (
 
 -- 1.2 Products
 CREATE TABLE public.products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    category TEXT NOT NULL, -- Keep for compatibility, though categories table exists
+    category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL, -- Relational Category
+    category TEXT NOT NULL, -- Keep for compatibility / denormalization
     price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
     quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     barcode TEXT UNIQUE NOT NULL,
@@ -43,7 +45,7 @@ CREATE TABLE public.products (
 
 -- 1.3 Product Images
 CREATE TABLE public.product_images (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     image_url TEXT NOT NULL,
     is_primary BOOLEAN DEFAULT false,
@@ -52,10 +54,10 @@ CREATE TABLE public.product_images (
 
 -- 1.4 Inventory Logs
 CREATE TABLE public.inventory (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     change INTEGER NOT NULL, -- Positive for restock, negative for sale/loss
-    reason TEXT NOT NULL CHECK (reason IN ('RESTOCK', 'SALE', 'ADJUSTMENT', 'PURCHASE_ORDER')),
+    reason TEXT NOT NULL CHECK (reason IN ('RESTOCK', 'SALE', 'ADJUSTMENT')),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
@@ -65,7 +67,7 @@ CREATE TABLE public.inventory (
 
 -- 2.1 POS Staff (Formerly 'users')
 CREATE TABLE public.pos_staff (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
@@ -79,7 +81,7 @@ CREATE TABLE public.pos_staff (
 
 -- 3.1 POS Customers (Internal / In-store)
 CREATE TABLE public.customer (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     phone TEXT,
     email TEXT,
@@ -91,7 +93,7 @@ CREATE TABLE public.customer (
 
 -- 3.2 E-Commerce Customers (Online Shoppers)
 CREATE TABLE public.e_customer (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -108,19 +110,20 @@ CREATE TABLE public.e_customer (
 
 -- 4.1 Sales
 CREATE TABLE public.sales (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cashier_id UUID NOT NULL REFERENCES public.pos_staff(id) ON DELETE RESTRICT,
     customer_id UUID REFERENCES public.customer(id) ON DELETE SET NULL,
     total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
     discount NUMERIC(10, 2) DEFAULT 0 CHECK (discount >= 0),
     final_amount NUMERIC(10, 2) NOT NULL CHECK (final_amount >= 0),
     payment_method TEXT NOT NULL CHECK (payment_method IN ('CASH', 'MOBILE_MONEY', 'CARD')),
+    promo_code TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 -- 4.2 Sales Items
 CREATE TABLE public.sales_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
     product_name TEXT NOT NULL,
@@ -132,7 +135,7 @@ CREATE TABLE public.sales_items (
 
 -- 4.3 Payments (Detailed log)
 CREATE TABLE public.payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
     amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
     method TEXT NOT NULL CHECK (method IN ('CASH', 'MOBILE_MONEY', 'CARD')),
@@ -145,7 +148,7 @@ CREATE TABLE public.payments (
 
 -- 5.1 Delivery Points
 CREATE TABLE public.delivery_points (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     address TEXT NOT NULL,
     active BOOLEAN DEFAULT true,
@@ -154,7 +157,7 @@ CREATE TABLE public.delivery_points (
 
 -- 5.2 Online Orders
 CREATE TABLE public.online_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     e_customer_id UUID REFERENCES public.e_customer(id) ON DELETE SET NULL,
     delivery_point_id UUID REFERENCES public.delivery_points(id) ON DELETE SET NULL,
     delivery_address TEXT,
@@ -164,6 +167,7 @@ CREATE TABLE public.online_orders (
     payment_method TEXT NOT NULL DEFAULT 'CARD'
         CHECK (payment_method IN ('CARD','MOBILE_MONEY','PAY_ON_DELIVERY')),
     payment_reference TEXT,
+    promo_name TEXT,
     -- Processing fields for POS integration
     processing_staff_id UUID REFERENCES public.pos_staff(id),
     processed_by UUID REFERENCES public.pos_staff(id), -- Redundant but kept for history
@@ -174,7 +178,7 @@ CREATE TABLE public.online_orders (
 
 -- 5.3 Online Order Items
 CREATE TABLE public.online_order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES public.online_orders(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
     product_name TEXT NOT NULL,
@@ -186,7 +190,7 @@ CREATE TABLE public.online_order_items (
 
 -- 5.4 Product Reviews
 CREATE TABLE public.product_reviews (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     e_customer_id UUID REFERENCES public.e_customer(id) ON DELETE SET NULL,
     rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
@@ -194,15 +198,26 @@ CREATE TABLE public.product_reviews (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
+-- 5.5 Persistent E-Commerce Cart
+CREATE TABLE public.e_cart (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    e_customer_id UUID REFERENCES public.e_customer(id) ON DELETE CASCADE UNIQUE,
+    items JSONB DEFAULT '[]'::jsonb,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- 5.6 Promotions
 CREATE TABLE public.promotions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL, -- Campaign name
     code TEXT UNIQUE NOT NULL,
-    discount_percentage NUMERIC(5, 2) NOT NULL CHECK (discount_percentage >= 0 AND discount_percentage <= 100),
-    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    active BOOLEAN DEFAULT true,
+    discount_type TEXT NOT NULL DEFAULT 'PERCENT' CHECK (discount_type IN ('FLAT', 'PERCENT')),
+    discount_value NUMERIC(10, 2) NOT NULL CHECK (discount_value >= 0),
+    min_subtotal NUMERIC(10, 2) DEFAULT 0 CHECK (min_subtotal >= 0),
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT true,
+    usage_count INTEGER DEFAULT 0 CHECK (usage_count >= 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
@@ -212,7 +227,7 @@ CREATE TABLE public.promotions (
 
 -- 6.1 Suppliers
 CREATE TABLE public.suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     contact_person TEXT,
     email TEXT,
@@ -223,7 +238,7 @@ CREATE TABLE public.suppliers (
 
 -- 6.2 Purchase Orders (Restocking)
 CREATE TABLE public.purchase_orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'RECEIVED', 'CANCELLED')),
     total_amount NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
@@ -232,7 +247,7 @@ CREATE TABLE public.purchase_orders (
 
 -- 6.3 Purchase Order Items
 CREATE TABLE public.purchase_order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     po_id UUID NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
@@ -243,7 +258,7 @@ CREATE TABLE public.purchase_order_items (
 
 -- 6.4 Expenses
 CREATE TABLE public.expenses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     description TEXT NOT NULL,
     amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
     expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -253,7 +268,7 @@ CREATE TABLE public.expenses (
 
 -- 6.5 Store Settings
 CREATE TABLE public.store_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_name TEXT NOT NULL DEFAULT 'My Store',
     currency TEXT NOT NULL DEFAULT 'USD',
     currency_symbol TEXT DEFAULT '$',
@@ -265,7 +280,7 @@ CREATE TABLE public.store_settings (
 
 -- 6.6 Product-Supplier Links
 CREATE TABLE public.product_suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     supplier_id UUID NOT NULL REFERENCES public.suppliers(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -285,6 +300,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+CREATE TRIGGER update_e_cart_updated_at BEFORE UPDATE
+    ON e_cart FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_store_settings_updated_at BEFORE UPDATE
     ON store_settings FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
@@ -327,6 +344,7 @@ ALTER TABLE public.delivery_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.online_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.online_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.e_cart ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_orders ENABLE ROW LEVEL SECURITY;
@@ -352,6 +370,7 @@ CREATE POLICY "Allow all to public" ON public.delivery_points FOR ALL USING (tru
 CREATE POLICY "Allow all to public" ON public.online_orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.online_order_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.product_reviews FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all to public" ON public.e_cart FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.promotions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.suppliers FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all to public" ON public.purchase_orders FOR ALL USING (true) WITH CHECK (true);
@@ -374,6 +393,7 @@ DECLARE
     'pos_staff',
     'customer',
     'e_customer',
+    'e_cart',
     'online_order_items',
     'sales_items',
     'product_suppliers'
@@ -381,28 +401,48 @@ DECLARE
   t TEXT;
 BEGIN
   FOREACH t IN ARRAY tables LOOP
-    EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
-  EXCEPTION
-    WHEN duplicate_object THEN
-      RAISE NOTICE 'Table % already in publication', t;
-    WHEN undefined_object THEN
-      RAISE NOTICE 'Publication supabase_realtime does not exist - please enable it in your Supabase dashboard';
-  END;
-END LOOP;
+    BEGIN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
+    EXCEPTION
+      WHEN duplicate_object THEN
+        RAISE NOTICE 'Table % already in publication', t;
+      WHEN undefined_object THEN
+        RAISE NOTICE 'Publication supabase_realtime does not exist - please enable it in your Supabase dashboard';
+    END;
+  END LOOP;
+END;
 $$;
 
 -- ==========================================
--- 10. SEED DATA
+-- 10. INITIAL CONFIGURATION (Minimal)
 -- ==========================================
 
--- Default Delivery Points
+-- Default Delivery Points (Minimal)
 INSERT INTO public.delivery_points (name, address) VALUES
-  ('Main Branch Pickup', '123 Commerce Avenue, City Centre'),
-  ('North Distribution Hub', '45 Industrial Road, North Side'),
-  ('South Depot', '77 Southern Boulevard, South End')
+  ('Main Branch Pickup', '123 Commerce Avenue, City Centre')
 ON CONFLICT DO NOTHING;
 
 -- Default Store Settings
 INSERT INTO public.store_settings (store_name, currency, currency_symbol) 
 VALUES ('StarMart POS', 'USD', '$') 
 ON CONFLICT DO NOTHING;
+
+-- ==========================================
+-- 11. FINAL PERMISSIONS & CACHE REFRESH
+-- ==========================================
+
+-- Grant permissions on the schema itself
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- Grant permissions on ALL existing tables, sequences, and functions
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- Ensure FUTURE tables also get these permissions automatically
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+
+-- Notify PostgREST to refresh its schema cache
+NOTIFY pgrst, 'reload schema';

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StoreSettings } from '@/lib/types';
 import { getStoreSettings, updateStoreSettings } from '@/lib/db';
-import { useToastStore } from '@/lib/store';
+import { useToastStore, useSettingsStore, SettingsState } from '@/lib/store';
 import { Save, Store, Globe, Percent, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LiveStatus } from '@/components/ui/LiveStatus';
@@ -16,7 +16,7 @@ const POPULAR_CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
   { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi' },
+  { code: 'GHS', symbol: '₵', name: 'Ghanaian Cedi' },
   { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
   { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
   { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
@@ -31,10 +31,12 @@ export default function ConfigPage() {
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { addToast } = useToastStore();
+  const refreshGlobalSettings = useSettingsStore((state: SettingsState) => state.refreshSettings);
 
   const [form, setForm] = useState({
     storeName: '',
-    currency: 'USD',
+    currency: 'GHS',
+    currencySymbol: '₵',
     taxRate: 0,
     receiptHeader: '',
     receiptFooter: ''
@@ -57,6 +59,7 @@ export default function ConfigPage() {
       setForm({
         storeName: data.storeName,
         currency: data.currency,
+        currencySymbol: data.currencySymbol,
         taxRate: data.taxRate,
         receiptHeader: data.receiptHeader || '',
         receiptFooter: data.receiptFooter || ''
@@ -69,7 +72,13 @@ export default function ConfigPage() {
     if (!settings) return;
     setIsSaving(true);
     try {
-      await updateStoreSettings(settings.id, form);
+      // Find the symbol for the selected currency code if not already set correctly
+      const symbol = POPULAR_CURRENCIES.find(c => c.code === form.currency)?.symbol || '$';
+      await updateStoreSettings(settings.id, { ...form, currencySymbol: symbol });
+      
+      // Update global store state for POS and other components
+      await refreshGlobalSettings();
+      
       addToast('Application settings saved successfully', 'success');
       await refetch();
     } catch {
@@ -168,7 +177,11 @@ export default function ConfigPage() {
                      <select 
                         className="w-full h-11 rounded-xl border border-border bg-muted/20 px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold"
                         value={form.currency}
-                        onChange={e => setForm({ ...form, currency: e.target.value })}
+                        onChange={e => {
+                          const code = e.target.value;
+                          const found = POPULAR_CURRENCIES.find(c => c.code === code);
+                          setForm({ ...form, currency: code, currencySymbol: found?.symbol || '$' });
+                        }}
                      >
                        {POPULAR_CURRENCIES.map(c => (
                          <option key={c.code} value={c.code}>
@@ -243,7 +256,7 @@ export default function ConfigPage() {
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-0.5">
                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Currency:</p>
-                           <p className="text-lg font-bold text-primary">{POPULAR_CURRENCIES.find(c => c.code === form.currency)?.symbol} ({form.currency})</p>
+                           <p className="text-lg font-bold text-primary">{form.currencySymbol} ({form.currency})</p>
                         </div>
                         <div className="space-y-0.5">
                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Taxation:</p>

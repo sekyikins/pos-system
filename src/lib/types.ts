@@ -89,6 +89,7 @@ export interface Sale {
   finalAmount: number;
   paymentMethod: 'CASH' | 'MOBILE_MONEY' | 'CARD';
   promoCode?: string;
+  status?: string;
   timestamp: string; // ISO string
 }
 
@@ -135,6 +136,7 @@ export interface StoreSettings {
   id: string;
   storeName: string;
   currency: string;
+  currencySymbol: string;
   taxRate: number;
   receiptHeader: string | null;
   receiptFooter: string | null;
