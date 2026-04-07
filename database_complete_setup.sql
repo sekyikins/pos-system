@@ -57,7 +57,9 @@ CREATE TABLE public.inventory (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     change INTEGER NOT NULL, -- Positive for restock, negative for sale/loss
-    reason TEXT NOT NULL CHECK (reason IN ('RESTOCK', 'SALE', 'ADJUSTMENT')),
+    reason TEXT NOT NULL CHECK (reason IN ('RESTOCK', 'SALE', 'ADJUSTMENT', 'LOSS', 'RETURN', 'PURCHASE_ORDER')),
+    supplier_id UUID REFERENCES public.suppliers(id) ON DELETE SET NULL,
+    staff_id UUID REFERENCES public.pos_staff(id) ON DELETE SET NULL,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 

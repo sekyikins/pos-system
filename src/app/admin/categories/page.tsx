@@ -116,7 +116,7 @@ export default function CategoriesPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 h-[60vh]">
           {isLoading ? (
             <div className="space-y-0.5">
               {[...Array(4)].map((_, i) => (
@@ -134,16 +134,16 @@ export default function CategoriesPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left align-middle font-medium">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+            <div className="overflow-y-auto max-h-full">
+              <table className="w-full text-sm text-left align-middle font-medium border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10 bg-card text-[10px] uppercase font-bold text-muted-foreground/70 shadow-sm">
                   <tr>
-                    <th className="px-6 py-4">Category Details</th>
-                    <th className="px-6 py-4">Description</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4 border-b border-border/50">Category Details</th>
+                    <th className="px-6 py-4 border-b border-border/50">Description</th>
+                    <th className="px-6 py-4 text-right border-b border-border/50">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40">
+                <tbody className="divide-y divide-border/40 overflow-y-auto">
                   {filtered.length === 0 ? (
                     <tr><td colSpan={3} className="px-6 py-12 text-center text-muted-foreground font-medium italic">No categories matched.</td></tr>
                   ) : filtered.map(c => (

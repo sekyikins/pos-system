@@ -372,7 +372,7 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
     if (po.status === 'RECEIVED') return; // already received
 
     for (const item of po.purchase_order_items) {
-      await adjustInventory(item.product_id, item.quantity, 'PURCHASE_ORDER');
+      await adjustInventory(item.product_id, item.quantity, 'RESTOCK', po.supplier_id);
     }
   }
 

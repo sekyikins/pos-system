@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Product, Category, Supplier } from '@/lib/types';
-import { getProducts, addProduct, updateProduct, deleteProduct, getCategories, getSuppliers } from '@/lib/db';
+import { getProducts, addProduct, updateProduct, deleteProduct, getCategories, getSuppliers, addCategory, addSupplier } from '@/lib/db';
 import { useToastStore, useSettingsStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Package, Loader2, Upload, ImageIcon, Boxes, Barcode, Truck } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, Upload, ImageIcon, Boxes, Barcode, Truck, Tag } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
@@ -21,15 +21,48 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<'name' | 'category' | 'price' | 'stock'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  
+  const [newCatName, setNewCatName] = useState('');
+  const [newSupName, setNewSupName] = useState('');
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
 
-  const [formData, setFormData] = useState({ name: '', categoryId: '', price: '', quantity: '', barcode: '', supplierName: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    categoryId: '', // Using this for both display name and selection logic in datalists
+    category: '',
+    price: '',
+    quantity: '',
+    barcode: '',
+    description: '',
+    supplierId: '',
+    supplierName: '',
+  });
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const fetchSupportingData = useCallback(async () => {
+    try {
+      const [cats, sups] = await Promise.all([getCategories(), getSuppliers()]);
+      setCategories(cats);
+      setSuppliers(sups);
+    } catch (err) {
+      console.error('Failed to fetch support data:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSupportingData();
+  }, [fetchSupportingData]);
 
   const { data: products, isLoading, connectionStatus, refetch } = useRealtimeTable<Product>({
     table: 'products',
@@ -38,41 +71,22 @@ export default function ProductsPage() {
     refetchOnChange: true
   });
 
-  useEffect(() => {
-    async function loadResources() {
-      try { 
-        const [c, s] = await Promise.all([getCategories(), getSuppliers()]);
-        setCategories(c);
-        setSuppliers(s);
-      } catch (e) { console.error('Failed to load metadata', e); }
-    }
-    loadResources();
-  }, []);
-
-  const processedProducts = useMemo<Product[]>(() => {
+  const processedProducts = useMemo(() => {
     const filtered = products.filter(p =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.barcode.includes(searchQuery) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.supplierName?.toLowerCase().includes(searchQuery.toLowerCase())
+      p.barcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return [...filtered].sort((a, b) => {
       let valA: string | number = '';
       let valB: string | number = '';
-      if (sortKey === 'name') {
-        valA = a.name.toLowerCase();
-        valB = b.name.toLowerCase();
-      } else if (sortKey === 'category') {
-        valA = a.category.toLowerCase();
-        valB = b.category.toLowerCase();
-      } else if (sortKey === 'price') {
-        valA = a.price;
-        valB = b.price;
-      } else if (sortKey === 'stock') {
-        valA = a.quantity;
-        valB = b.quantity;
-      }
+
+      if (sortKey === 'name') { valA = a.name.toLowerCase(); valB = b.name.toLowerCase(); }
+      else if (sortKey === 'category') { valA = (a.category || '').toLowerCase(); valB = (b.category || '').toLowerCase(); }
+      else if (sortKey === 'price') { valA = a.price; valB = b.price; }
+      else if (sortKey === 'stock') { valA = a.quantity; valB = b.quantity; }
+
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -82,66 +96,107 @@ export default function ProductsPage() {
   const handleOpenModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
-      setFormData({ 
-        name: product.name, 
-        categoryId: product.categoryId || '', 
-        price: product.price.toString(), 
-        quantity: product.quantity.toString(), 
+      setFormData({
+        name: product.name,
+        categoryId: product.category, // In your datalist implementation, category name is used
+        category: product.category,
+        price: product.price.toString(),
+        quantity: product.quantity.toString(),
         barcode: product.barcode,
-        supplierName: product.supplierName || ''
+        description: product.description || '',
+        supplierId: product.supplierId || '',
+        supplierName: product.supplierName || '',
       });
       setPreviewUrl(product.image_url || null);
     } else {
       setEditingProduct(null);
-      setFormData({ name: '', categoryId: '', price: '', quantity: '', barcode: '', supplierName: '' });
+      setFormData({
+        name: '', categoryId: '', category: '', price: '', quantity: '',
+        barcode: '', description: '', supplierId: '', supplierName: '',
+      });
       setPreviewUrl(null);
+      setSelectedFile(null);
     }
-    setSelectedFile(null);
     setIsModalOpen(true);
   };
 
-  const handleCloseModal = () => { setIsModalOpen(false); setEditingProduct(null); setSelectedFile(null); setPreviewUrl(null); };
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
+    setIsAddingNew(true);
+    try {
+      const cat = await addCategory(newCatName, '');
+      await fetchSupportingData();
+      setFormData(prev => ({ ...prev, categoryId: cat.name, category: cat.name }));
+      setIsCategoryModalOpen(false);
+      setNewCatName('');
+      addToast('Category added successfully', 'success');
+    } catch {
+      addToast('Failed to add category', 'error');
+    } finally {
+      setIsAddingNew(false);
+    }
+  };
+
+  const handleAddSupplier = async () => {
+    if (!newSupName.trim()) return;
+    setIsAddingNew(true);
+    try {
+      const sup = await addSupplier({ name: newSupName, contactPerson: null, email: null, phone: null, address: null });
+      await fetchSupportingData();
+      setFormData(prev => ({ ...prev, supplierId: sup.id, supplierName: sup.name }));
+      setIsSupplierModalOpen(false);
+      setNewSupName('');
+      addToast('Supplier added successfully', 'success');
+    } catch {
+      addToast('Failed to add supplier', 'error');
+    } finally {
+      setIsAddingNew(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      const selectedCat = categories.find(c => c.id === formData.categoryId);
-      const productData = { 
-        name: formData.name, 
-        categoryId: formData.categoryId,
-        category: selectedCat?.name || 'Uncategorized',
-        price: parseFloat(formData.price), 
-        quantity: parseInt(formData.quantity), 
-        barcode: formData.barcode,
-        supplierName: formData.supplierName || undefined
+      // Find actual category object from the name in categoryId if possible
+      const selectedCat = categories.find(c => c.name === formData.categoryId);
+      const submissionData = {
+        ...formData,
+        categoryId: selectedCat?.id || undefined,
+        category: formData.categoryId, // Ensure the name matches the datalist input
+        price: Number(formData.price),
+        quantity: Number(formData.quantity),
       };
+
       if (editingProduct) {
-        await updateProduct(editingProduct.id, productData, undefined, selectedFile || undefined);
-        addToast('Product updated successfully', 'success');
+        await updateProduct(editingProduct.id, submissionData, undefined, selectedFile || undefined);
+        addToast('Product updated', 'success');
       } else {
-        await addProduct(productData, selectedFile || undefined);
-        addToast('Product added successfully', 'success');
+        await addProduct(submissionData, selectedFile || undefined);
+        addToast('Product added', 'success');
       }
+      setIsModalOpen(false);
       refetch();
-      handleCloseModal();
     } catch (err) {
-      console.error(err);
-      addToast(err instanceof Error ? err.message : 'Failed to save product', 'error');
+      const message = err instanceof Error ? err.message : 'Failed to save';
+      addToast(message, 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
-      try {
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+    try {
         await deleteProduct(id);
-        addToast('Product deleted', 'info');
+        addToast('Product deleted', 'success');
         refetch();
-      } catch {
-        addToast('Failed to delete product', 'error');
-      }
+    } catch {
+        addToast('Failed to delete', 'error');
     }
   };
 
@@ -240,7 +295,7 @@ export default function ProductsPage() {
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {processedProducts.length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No products found.</td></tr>
+                    <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No products found.</td></tr>
                   ) : (
                     processedProducts.map((product: Product) => (
                       <tr key={product.id} className="hover:bg-primary/5 transition-all group">
@@ -260,7 +315,7 @@ export default function ProductsPage() {
                           </div>
                         </td>
                         <td className="p-3">
-                          <Badge variant="outline" className="rounded-lg bg-info/5 text-info border-info/20 font-bold px-2.5 py-1">
+                          <Badge variant="outline" className="rounded-lg bg-indigo-500/5 text-indigo-500 border-indigo-500/20 font-bold px-2.5 py-1">
                             {product.category}
                           </Badge>
                         </td>
@@ -361,8 +416,9 @@ export default function ProductsPage() {
              </div>
 
              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2 ml-1">
-                   <Package className="h-3.5 w-3.5 text-primary" /> Category
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center justify-between px-1">
+                   <span className="flex items-center gap-2"><Tag className="h-3.5 w-3.5 text-primary" /> Category</span>
+                   <button type="button" onClick={() => setIsCategoryModalOpen(true)} className="text-[10px] text-primary hover:underline font-black">+ NEW</button>
                 </label>
                 <div className="relative group">
                   <input 
@@ -380,8 +436,9 @@ export default function ProductsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                   <Truck className="h-3.5 w-3.5" /> Supplier
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center justify-between px-1">
+                   <span className="flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Supplier</span>
+                   <button type="button" onClick={() => setIsSupplierModalOpen(true)} className="text-[10px] text-primary hover:underline font-black">+ NEW</button>
                 </label>
                 <div className="relative group">
                   <input 
@@ -416,11 +473,12 @@ export default function ProductsPage() {
                 value={formData.quantity} 
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} 
                 required 
+                disabled={!!editingProduct}
               />
               
               <div className="md:col-span-2">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                  <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 px-1">
                     <Barcode className="h-3.5 w-3.5" /> Identifier / Barcode
                   </label>
                   <Input 
@@ -436,11 +494,61 @@ export default function ProductsPage() {
 
           <div className="flex justify-end gap-3 pt-6 border-t border-border mt-6">
             <Button type="button" variant="outline" onClick={handleCloseModal} disabled={isSaving} className="rounded-xl font-bold">Discard</Button>
-            <Button type="submit" disabled={isSaving} className="rounded-xl font-bold min-w-[160px] shadow-lg shadow-primary/20">
+            <Button 
+              type="submit" 
+              disabled={
+                isSaving || 
+                !formData.name.trim() || 
+                !formData.price || 
+                !formData.quantity || 
+                !formData.barcode.trim() || 
+                !categories.some(c => c.name === formData.categoryId) || 
+                !suppliers.some(s => s.name === formData.supplierName)
+              } 
+              className="rounded-xl font-bold min-w-[160px] shadow-lg shadow-primary/20"
+            >
               {isSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Processing...</> : (editingProduct ? 'Commit Changes' : 'Initialize Product')}
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Sub-Modal: Add Category */}
+      <Modal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} title="Quick Category Setup" size="sm">
+          <div className="space-y-4 pt-2">
+            <Input 
+              label="New Category Name" 
+              placeholder="e.g. Fresh Produce" 
+              value={newCatName} 
+              onChange={e => setNewCatName(e.target.value)}
+              className="h-11 rounded-xl"
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setIsCategoryModalOpen(false)} className="rounded-lg h-9">Back</Button>
+              <Button onClick={handleAddCategory} disabled={isAddingNew || !newCatName.trim()} className="rounded-lg h-9">
+                 {isAddingNew ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm & Add'}
+              </Button>
+            </div>
+          </div>
+      </Modal>
+
+      {/* Sub-Modal: Add Supplier */}
+      <Modal isOpen={isSupplierModalOpen} onClose={() => setIsSupplierModalOpen(false)} title="Quick Supplier Registration" size="sm">
+          <div className="space-y-4 pt-2">
+            <Input 
+              label="Company / Vendor Name" 
+              placeholder="e.g. Unilever Distrib." 
+              value={newSupName} 
+              onChange={e => setNewSupName(e.target.value)}
+              className="h-11 rounded-xl"
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setIsSupplierModalOpen(false)} className="rounded-lg h-9">Back</Button>
+              <Button onClick={handleAddSupplier} disabled={isAddingNew || !newSupName.trim()} className="rounded-lg h-9">
+                 {isAddingNew ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm & Add'}
+              </Button>
+            </div>
+          </div>
       </Modal>
     </div>
   );

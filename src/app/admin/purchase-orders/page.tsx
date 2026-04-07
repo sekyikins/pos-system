@@ -126,9 +126,15 @@ export default function PurchaseOrdersPage() {
     if (field === 'productId') {
       newItems[index].productId = value as string;
       const prod = products.find(p => p.id === value);
-      if (prod) newItems[index].unitCost = prod.price * 0.7;
+      if (prod) newItems[index].unitCost = Number((prod.price * 0.7).toFixed(2));
     } else {
-      newItems[index][field] = value as number;
+      let val = 0;
+      if (field === 'quantity') {
+        val = parseInt(value as string) || 0;
+      } else if (field === 'unitCost') {
+        val = parseFloat(value as string) || 0;
+      }
+      (newItems[index][field] as number) = val;
     }
     setPoItems(newItems);
   };
@@ -419,7 +425,7 @@ export default function PurchaseOrdersPage() {
              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                {poItems.map((item, index) => (
                  <div key={index} className="grid grid-cols-12 gap-3 items-end bg-muted/20 p-4 rounded-2xl border border-border/30 relative group">
-                    <div className="col-span-12 md:col-span-5 space-y-1.5">
+                    <div className="col-span-12 md:col-span-4 space-y-1.5">
                        <label className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground px-1">Product</label>
                        <select
                         className="h-10 w-full rounded-lg border border-border bg-card px-3 text-xs font-bold appearance-none"
@@ -431,30 +437,36 @@ export default function PurchaseOrdersPage() {
                         {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.quantity})</option>)}
                       </select>
                     </div>
-                    <div className="col-span-6 md:col-span-3 space-y-1.5">
+                    <div className="col-span-4 md:col-span-2 space-y-1.5">
                        <label className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground px-1">Quantity</label>
                        <Input 
                         type="number" 
                         min="1" 
                         className="h-10 rounded-lg text-xs" 
-                        value={item.quantity} 
-                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value))} 
+                        value={item.quantity || ''} 
+                        onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
                         required 
                        />
                     </div>
-                    <div className="col-span-6 md:col-span-3 space-y-1.5">
+                    <div className="col-span-4 md:col-span-3 space-y-1.5">
                        <label className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground px-1">Unit Cost</label>
                        <Input 
                         type="number" 
                         step="0.01" 
                         min="0" 
                         className="h-10 rounded-lg text-xs" 
-                        value={item.unitCost} 
-                        onChange={(e) => updateItem(index, 'unitCost', parseFloat(e.target.value))} 
+                        value={item.unitCost || ''} 
+                        onChange={(e) => updateItem(index, 'unitCost', e.target.value)} 
                         required 
                        />
                     </div>
-                    <div className="col-span-12 md:col-span-1 flex justify-end pb-1.5">
+                    <div className="col-span-4 md:col-span-3 space-y-1.5">
+                       <label className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground px-1 text-right block">Subtotal</label>
+                       <div className="h-10 flex items-center justify-end px-3 rounded-lg border border-border/50 bg-muted/30 text-xs font-bold text-foreground">
+                         {currencySymbol}{( (item.quantity || 0) * (item.unitCost || 0) ).toFixed(2)}
+                       </div>
+                    </div>
+                    <div className="col-span-12 md:col-span-1 flex justify-end pb-1">
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeItemFromPO(index)} className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 rounded-lg">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -471,7 +483,7 @@ export default function PurchaseOrdersPage() {
 
           <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex justify-between items-center">
              <span className="text-sm font-bold text-primary/70 uppercase tracking-widest">Est. Order Value</span>
-             <span className="text-xl font-bold text-primary">{currencySymbol}{poItems.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0).toFixed(2)}</span>
+             <span className="text-xl font-bold text-primary">{currencySymbol}{poItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitCost || 0)), 0).toFixed(2)}</span>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border mt-8">

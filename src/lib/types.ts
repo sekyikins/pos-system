@@ -24,6 +24,7 @@ export interface Product {
   price: number;
   quantity: number;
   barcode: string;
+  description?: string;
   image_url?: string;
   supplierId?: string;
   supplierName?: string;
@@ -97,8 +98,12 @@ export interface InventoryLog {
   id: string;
   productId: string;
   change: number; // positive or negative
-  reason: 'RESTOCK' | 'SALE' | 'ADJUSTMENT' | 'PURCHASE_ORDER';
+  reason: 'RESTOCK' | 'SALE' | 'ADJUSTMENT' | 'PURCHASE_ORDER' | 'LOSS' | 'RETURN' | string;
   timestamp: string;
+  supplierId?: string;
+  supplierName?: string;
+  staffId?: string;
+  staffName?: string;
 }
 
 export interface PurchaseOrder {

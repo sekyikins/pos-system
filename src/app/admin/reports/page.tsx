@@ -3,9 +3,9 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Sale, Product } from '@/lib/types';
+import { Sale, Product, Promotion } from '@/lib/types';
 import { getSales, getProducts } from '@/lib/db';
-import { getStorefrontSales } from '@/lib/db_extended';
+import { getStorefrontSales, getPromotions } from '@/lib/db_extended';
 import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
@@ -18,7 +18,7 @@ interface DailyStat { date: string; sales: number; revenue: number; }
 export default function ReportsPage() {
   const { currencySymbol } = useSettingsStore();
   const [reportSource, setReportSource] = React.useState<'IN-STORE' | 'STOREFRONT'>('IN-STORE');
-  const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = React.useState<string>('DELIVERED');
   const [paymentFilter, setPaymentFilter] = React.useState<string>('ALL');
 
   const { data: posSales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
@@ -42,26 +42,29 @@ export default function ReportsPage() {
     refetchOnChange: true
   });
 
+  const { data: promotions, isLoading: loadingPromos, connectionStatus: promosStatus } = useRealtimeTable<Promotion>({
+    table: 'promotions',
+    initialData: [],
+    fetcher: getPromotions,
+    refetchOnChange: true
+  });
+
   const sales = useMemo(() => {
-    let data = reportSource === 'IN-STORE' ? posSales : onlineSales;
-    
-    if (statusFilter !== 'ALL') {
-      data = data.filter(s => {
-        const st = s.status || 'COMPLETED';
-        return st === statusFilter;
-      });
-    }
-    
+    let data = reportSource === 'IN-STORE' ? posSales : onlineSales.filter(s => {
+      const st = s.status || 'PENDING';
+      return st === statusFilter;
+    });
+
     if (paymentFilter !== 'ALL') {
-       data = data.filter(s => s.paymentMethod === paymentFilter);
+      data = data.filter(s => s.paymentMethod === paymentFilter);
     }
     return data;
   }, [reportSource, posSales, onlineSales, statusFilter, paymentFilter]);
 
-  const isLoading = loadingSales || loadingProducts || loadingOnline;
+  const isLoading = loadingSales || loadingProducts || loadingOnline || loadingPromos;
   const connectionStatus: ConnectionStatus =
-    salesStatus === 'connected' && productsStatus === 'connected' && onlineStatus === 'connected' ? 'connected' :
-    salesStatus === 'error' || productsStatus === 'error' || onlineStatus === 'error' ? 'error' : 'connecting';
+    salesStatus === 'connected' && productsStatus === 'connected' && onlineStatus === 'connected' && promosStatus === 'connected' ? 'connected' :
+    salesStatus === 'error' || productsStatus === 'error' || onlineStatus === 'error' || promosStatus === 'error' ? 'error' : 'connecting';
 
   // ─── Compute stats (memoized) ────────────────────────────────────
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.finalAmount, 0), [sales]);
@@ -94,33 +97,76 @@ export default function ReportsPage() {
   }, [sales, products]);
 
   const { dailyStats, maxRevenue } = useMemo(() => {
-    const dailyMap: Record<string, DailyStat> = {};
+    const dailyMap: Record<string, DailyStat & { isCurrentWeek: boolean }> = {};
     const today = new Date();
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split('T')[0];
-      dailyMap[key] = { date: key, sales: 0, revenue: 0 };
+    today.setHours(0, 0, 0, 0);
+    
+    const weekAgo = new Date();
+    weekAgo.setDate(today.getDate() - 7);
+    
+    // 1. Find earliest sale date to start the chart from
+    let startDate = new Date();
+    startDate.setDate(startDate.getDate() - 13); // Default 14 days if no sales
+    
+    if (sales.length > 0) {
+      const earliestSale = sales.reduce((min, s) => {
+        const d = new Date(s.timestamp);
+        return d < min ? d : min;
+      }, new Date());
+      startDate = new Date(earliestSale);
+      startDate.setHours(0, 0, 0, 0);
     }
+    
+    // 2. Initialize map from start date to today
+    const runner = new Date(startDate);
+    while (runner <= today) {
+      const key = runner.toISOString().split('T')[0];
+      dailyMap[key] = { 
+        date: key, 
+        sales: 0, 
+        revenue: 0, 
+        isCurrentWeek: runner >= weekAgo 
+      };
+      runner.setDate(runner.getDate() + 1);
+    }
+
+    // 3. Populate stats
     sales.forEach(sale => {
       const key = sale.timestamp.split('T')[0];
-      if (dailyMap[key]) { dailyMap[key].sales++; dailyMap[key].revenue += sale.finalAmount; }
+      if (dailyMap[key]) {
+        dailyMap[key].sales++;
+        dailyMap[key].revenue += Number(sale.finalAmount);
+      }
     });
-    const stats = Object.values(dailyMap);
+
+    const stats = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
     return { dailyStats: stats, maxRevenue: Math.max(...stats.map(d => d.revenue), 1) };
   }, [sales]);
 
   const promoStats = useMemo(() => {
     const stats: Record<string, { count: number; totalDiscount: number }> = {};
+    
+    // Create a code-to-name lookup for in-store sales
+    const promoLookup: Record<string, string> = {};
+    promotions.forEach(p => {
+      promoLookup[p.code] = p.name;
+    });
+
     sales.forEach(sale => {
       if (sale.promoCode && sale.promoCode !== 'null' && sale.promoCode.trim() !== '') {
-        if (!stats[sale.promoCode]) stats[sale.promoCode] = { count: 0, totalDiscount: 0 };
-        stats[sale.promoCode].count++;
-        stats[sale.promoCode].totalDiscount += sale.discount;
+        // For In-Store, promoCode is the CODE. For Storefront, it's already the NAME (mapped in db_extended)
+        // If it looks like a name (exists in names list) or we can't find the code, keep it.
+        const displayName = reportSource === 'IN-STORE' 
+          ? (promoLookup[sale.promoCode] || sale.promoCode)
+          : sale.promoCode;
+
+        if (!stats[displayName]) stats[displayName] = { count: 0, totalDiscount: 0 };
+        stats[displayName].count++;
+        stats[displayName].totalDiscount += sale.discount;
       }
     });
     return Object.entries(stats).sort((a, b) => b[1].totalDiscount - a[1].totalDiscount);
-  }, [sales]);
+  }, [sales, promotions, reportSource]);
 
   const { categoryStats, maxCat } = useMemo(() => {
     const categoryMap: Record<string, number> = {};
@@ -159,11 +205,10 @@ export default function ReportsPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-all appearance-none cursor-pointer focus:outline-none focus:border-primary shadow-sm"
               >
-                <option value="ALL">All Statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="SHIPPED">Shipped</option>
                 <option value="DELIVERED">Delivered</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="PENDING">Pending</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
             )}
@@ -181,7 +226,6 @@ export default function ReportsPage() {
               value={reportSource}
               onChange={(e) => {
                  setReportSource(e.target.value as 'IN-STORE' | 'STOREFRONT');
-                 if (e.target.value === 'IN-STORE') setStatusFilter('ALL');
               }}
               className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-muted/20 text-foreground hover:bg-muted/30 transition-all appearance-none cursor-pointer shadow-sm focus:outline-none focus:border-primary"
             >
@@ -228,10 +272,10 @@ export default function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart2 className="h-5 w-5" />
-              Daily Revenue &#8212; Last 14 Days
+              Daily Revenue
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-10 overflow-y-auto">
+          <CardContent className="pb-10 overflow-x-auto no-scrollbar">
             {isLoading ? (
               <div className="flex items-end gap-1.5 h-[300px]">
                 {[55, 30, 45, 60, 25, 80, 50, 65, 35, 75, 40, 20, 90, 55].map((h, i) => (
@@ -239,16 +283,16 @@ export default function ReportsPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex items-end gap-1.5 h-[300px]">
+              <div className="flex items-end gap-1.5 h-[300px] min-w-max pb-8">
                 {dailyStats.map(d => (
-                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
-                    <div className="relative w-full flex justify-center">
-                      <div title={`${currencySymbol}${d.revenue.toFixed(2)}`}
+                  <div key={d.date} className="w-12 flex flex-col items-center gap-1 group">
+                    <div className="relative w-full flex justify-center px-1">
+                      <div title={`${d.date}: ${currencySymbol}${d.revenue.toFixed(2)}`}
                         style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 240)}px` }}
-                        className="w-full bg-primary/70 hover:bg-primary rounded-t-sm transition-all"
+                        className={`w-full rounded-t-lg transition-all duration-300 ${d.isCurrentWeek ? 'bg-primary shadow-[0_0_15px_-3px_rgba(var(--primary),0.4)]' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'}`}
                       />
                     </div>
-                    <span className="text-[9px] text-muted-foreground rotate-45 origin-left mt-1 whitespace-nowrap">
+                    <span className={`text-[10px] font-bold rotate-45 origin-left mt-2 whitespace-nowrap transition-colors ${d.isCurrentWeek ? 'text-primary' : 'text-muted-foreground/60'}`}>
                       {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </span>
                   </div>
@@ -345,10 +389,10 @@ export default function ReportsPage() {
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[250px] overflow-y-auto">
-                  {promoStats.map(([code, stat]) => (
-                    <div key={code} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
+                  {promoStats.map(([name, stat]) => (
+                    <div key={name} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
                       <div>
-                        <p className="text-sm font-bold tracking-tight">{code}</p>
+                        <p className="text-sm font-bold tracking-tight">{name}</p>
                         <p className="text-xs text-muted-foreground">{stat.count} times applied</p>
                       </div>
                       <span className="text-sm font-bold text-warning">

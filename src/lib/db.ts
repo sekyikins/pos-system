@@ -69,6 +69,10 @@ function toInventoryLog(row: any): InventoryLog {
     change: row.change,
     reason: row.reason,
     timestamp: row.timestamp,
+    supplierId: row.supplier_id || undefined,
+    supplierName: row.suppliers?.name || undefined,
+    staffId: row.staff_id || undefined,
+    staffName: row.pos_staff?.name || undefined,
   };
 }
 
@@ -163,7 +167,7 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Prom
   return product;
 }
 
-export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT', imageFile?: File): Promise<Product | null> {
+export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | string, imageFile?: File, supplierId?: string, staffId?: string): Promise<Product | null> {
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
@@ -182,7 +186,7 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
     .single();
   if (error) return null;
 
-  // Update Supplier link
+  // Update Supplier link (Denormalized in product_suppliers)
   if (updates.supplierName) {
     let { data: supplier } = await supabase.from('suppliers').select('id').eq('name', updates.supplierName).single();
     if (!supplier) {
@@ -190,7 +194,6 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
       if (!supErr) supplier = newSup;
     }
     if (supplier) {
-      // For now we assume a product has one primary supplier we track here
       await supabase.from('product_suppliers').delete().eq('product_id', id);
       await supabase.from('product_suppliers').insert({ product_id: id, supplier_id: supplier.id });
     }
@@ -204,31 +207,31 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
       .from('Products Images')
       .upload(fileName, imageFile, { contentType: imageFile.type });
     if (storageErr) {
-      console.error('Storage Upload Error:', storageErr);
-      throw new Error(`Image upload failed: ${storageErr.message}. Ensure the "Products Images" bucket exists and has correct policies.`);
+      throw new Error(`Image upload failed: ${storageErr.message}`);
     }
     const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
-    // Delete old images first? For now just insert new one
     await supabase.from('product_images').delete().eq('product_id', id);
     await supabase.from('product_images').insert({ product_id: id, image_url: publicUrl });
     data.product_images = [{ image_url: publicUrl }];
   }
 
-  const product = toProduct(data);
-
-  // Log to inventory if quantity changed
+  // Log to inventory if quantity changed (Single Source of Truth for Logs)
   if (updates.quantity !== undefined && oldProd) {
-    const diff = updates.quantity - oldProd.quantity;
+    const diff = Number(updates.quantity) - Number(oldProd.quantity);
     if (diff !== 0) {
-      const logReason: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' = reasonOverride || (diff > 0 ? 'RESTOCK' : 'ADJUSTMENT');
-      await supabase.from('inventory').insert({
+      const logReason = reasonOverride || (diff > 0 ? 'RESTOCK' : 'ADJUSTMENT');
+      const { error: logErr } = await supabase.from('inventory').insert({
         product_id: id,
         change: diff,
         reason: logReason,
+        supplier_id: supplierId || null,
+        staff_id: staffId || null
       });
+      if (logErr) console.error('Inventory Log Error:', logErr);
     }
   }
 
+  const product = toProduct(data);
   return product;
 }
 
@@ -355,19 +358,20 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
 export async function getInventoryLogs(): Promise<InventoryLog[]> {
   const { data, error } = await supabase
     .from('inventory')
-    .select('*')
+    .select('*, suppliers(name), pos_staff(name)')
     .order('timestamp', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toInventoryLog);
 }
 
-export async function adjustInventory(productId: string, change: number, reason: InventoryLog['reason']): Promise<void> {
+export async function adjustInventory(productId: string, change: number, reason: InventoryLog['reason'], supplierId?: string, staffId?: string): Promise<void> {
   const product = await getProductById(productId);
   if (!product) throw new Error('Product not found');
   const newQty = product.quantity + change;
   if (newQty < 0) throw new Error('Stock cannot be negative');
-  await updateProduct(productId, { quantity: newQty });
-  await supabase.from('inventory').insert({ product_id: productId, change, reason });
+  
+  // Update product stock and let updateProduct handle the log
+  await updateProduct(productId, { quantity: newQty }, reason, undefined, supplierId, staffId);
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
