@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Sale, Product, Promotion } from '@/lib/types';
 import { getSales, getProducts } from '@/lib/db';
 import { getStorefrontSales, getPromotions } from '@/lib/db_extended';
-import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp } from 'lucide-react';
+import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
@@ -18,8 +19,9 @@ interface DailyStat { date: string; sales: number; revenue: number; }
 export default function ReportsPage() {
   const { currencySymbol } = useSettingsStore();
   const [reportSource, setReportSource] = React.useState<'IN-STORE' | 'STOREFRONT'>('IN-STORE');
-  const [statusFilter, setStatusFilter] = React.useState<string>('DELIVERED');
+  const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
   const [paymentFilter, setPaymentFilter] = React.useState<string>('ALL');
+  const [sortBy, setSortBy] = React.useState<'revenue' | 'unitsSold'>('revenue');
 
   const { data: posSales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
     table: 'sales',
@@ -52,6 +54,7 @@ export default function ReportsPage() {
   const sales = useMemo(() => {
     let data = reportSource === 'IN-STORE' ? posSales : onlineSales.filter(s => {
       const st = s.status || 'PENDING';
+      if (statusFilter === 'ALL') return st !== 'CANCELLED';
       return st === statusFilter;
     });
 
@@ -93,8 +96,8 @@ export default function ReportsPage() {
         map[item.productId].revenue += item.subtotal;
       });
     });
-    return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-  }, [sales, products]);
+    return Object.values(map).sort((a, b) => (b[sortBy] as number) - (a[sortBy] as number)).slice(0, 10);
+  }, [sales, products, sortBy]);
 
   const { dailyStats, maxRevenue } = useMemo(() => {
     const dailyMap: Record<string, DailyStat & { isCurrentWeek: boolean }> = {};
@@ -205,10 +208,11 @@ export default function ReportsPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-all appearance-none cursor-pointer focus:outline-none focus:border-primary shadow-sm"
               >
-                <option value="DELIVERED">Delivered</option>
-                <option value="SHIPPED">Shipped</option>
-                <option value="CONFIRMED">Confirmed</option>
+                <option value="ALL">All Active</option>
                 <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="DELIVERED">Delivered</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
             )}
@@ -218,9 +222,8 @@ export default function ReportsPage() {
               className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-all appearance-none cursor-pointer focus:outline-none focus:border-primary shadow-sm"
             >
               <option value="ALL">All Methods</option>
-              <option value="CARD">Card</option>
-              <option value="CASH">Cash & Delivery</option>
-              <option value="MOBILE_MONEY">Mobile Money</option>
+              <option value="PAYSTACK">Paystack</option>
+              <option value="CASH">Cash on Delivery</option>
             </select>
             <select
               value={reportSource}
@@ -249,7 +252,7 @@ export default function ReportsPage() {
           ))
         ) : (
           [
-            { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
+            { label: reportSource === 'STOREFRONT' ? `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).toLowerCase()} Revenue` : 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
             { label: 'Total Transactions', value: sales.length, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
             { label: 'Avg/Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
             { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
@@ -304,7 +307,19 @@ export default function ReportsPage() {
 
         {/* Other sections handle loading internally or can be simplified too */}
         <Card className='max-h-[850px] overflow-y-hidden'>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Top Products by Revenue</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              <div>Top Products by <span className='font-light'>{sortBy === 'revenue' ? 'Revenue' : 'Units Sold'}</span></div>
+            </CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => setSortBy(prev => prev === 'revenue' ? 'unitsSold' : 'revenue')}
+              className="h-8 px-2 rounded-lg border-2 hover:bg-muted/50"
+            >
+              <ArrowUpDown className="h-4 w-4" />
+            </Button>
+          </CardHeader>
           <CardContent className='max-h-[780px] overflow-y-auto'>
             {isLoading ? (
               <div className="space-y-4">

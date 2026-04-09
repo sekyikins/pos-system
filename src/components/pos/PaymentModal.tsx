@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/Input';
 import { useCartStore, useToastStore, useSettingsStore } from '@/lib/store';
 import { processSale } from '@/lib/db';
 import { useAuth } from '@/lib/auth';
-import { Banknote, CreditCard, Smartphone } from 'lucide-react';
+import { Banknote, CreditCard } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const PaystackHandler = dynamic(() => import('./PaystackHandler'), { ssr: false });
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -31,10 +34,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const cart = useCartStore();
   const { addToast } = useToastStore();
-  const { currencySymbol } = useSettingsStore();
+  const { currencySymbol, currency } = useSettingsStore();
   const { user } = useAuth();
+  
+  const paystackInitializeRef = React.useRef<((options: Record<string, unknown>) => void) | null>(null);
 
-  const [method, setMethod] = useState<'CASH' | 'CARD' | 'MOBILE_MONEY'>('CASH');
+  const [method, setMethod] = useState<'CASH' | 'PAYSTACK'>('CASH');
   const [amountGiven, setAmountGiven] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -45,6 +50,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleCheckout = async () => {
     if (cart.items.length === 0) return;
 
+    if (method === 'PAYSTACK') {
+      if (!paystackInitializeRef.current) {
+        addToast('Payment system is initializing...', 'info');
+        return;
+      }
+      setIsProcessing(true);
+      paystackInitializeRef.current({
+        onSuccess: (response: { reference: string }) => {
+          completeSale('PAYSTACK', response.reference);
+        },
+        onClose: () => {
+          setIsProcessing(false);
+          addToast('Payment cancelled.', 'info');
+        },
+      });
+      return;
+    }
+
+    completeSale('CASH');
+  };
+
+  const completeSale = async (paymentMethod: 'CASH' | 'PAYSTACK', reference?: string) => {
     setIsProcessing(true);
     try {
       const sale = await processSale({
@@ -54,7 +81,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         totalAmount: cart.getTotal(),
         discount,
         finalAmount: finalTotal,
-        paymentMethod: method,
+        paymentMethod,
+        paymentReference: reference,
         promoCode,
       });
 
@@ -70,14 +98,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Complete Payment">
+      <PaystackHandler
+        email={user?.username ? `${user.username}@starmart.com` : 'cashier@starmart.com'}
+        amount={Math.round(finalTotal * 100)}
+        publicKey={process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ''}
+        currency={currency}
+        initializeRef={paystackInitializeRef}
+      />
       <div className="space-y-5">
 
         {/* Payment Method Selector */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
             { id: 'CASH', label: 'Cash', Icon: Banknote },
-            { id: 'CARD', label: 'Card', Icon: CreditCard },
-            { id: 'MOBILE_MONEY', label: 'Mobile Money', Icon: Smartphone },
+            { id: 'PAYSTACK', label: 'Paystack', Icon: CreditCard },
           ].map(({ id, label, Icon }) => (
             <button
               key={id}

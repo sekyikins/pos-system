@@ -45,11 +45,15 @@ export default function AdminDashboard() {
   const connectionStatus: ConnectionStatus = prodStatus === 'connected' && salesStatus === 'connected' ? 'connected' : prodStatus === 'error' || salesStatus === 'error' ? 'error' : 'connecting';
 
   const stats = useMemo(() => {
+    const activeOnlineOrders = onlineOrders.filter(o => o.status !== 'CANCELLED');
     const posRevenue = sales.reduce((acc, s) => acc + s.finalAmount, 0);
-    const onlineRevenue = onlineOrders.reduce((acc, o) => acc + o.totalAmount, 0);
+    // Only delivered online orders count towards "Total Revenue"
+    const deliveredOnline = activeOnlineOrders.filter(o => o.status === 'DELIVERED');
+    const onlineRevenue = deliveredOnline.reduce((acc, o) => acc + o.totalAmount, 0);
+    
     const lowStock = products.filter(p => p.quantity < 10);
     return { 
-      totalSales: sales.length + onlineOrders.length, 
+      totalSales: sales.length + activeOnlineOrders.length, 
       totalRevenue: posRevenue + onlineRevenue, 
       totalProducts: products.length, 
       lowStock: lowStock.length 
@@ -66,14 +70,16 @@ export default function AdminDashboard() {
       type: 'IN-STORE' as const
     }));
     
-    const online = onlineOrders.map(o => ({
-      id: o.id,
-      timestamp: o.createdAt,
-      finalAmount: o.totalAmount,
-      itemsCount: 0,
-      paymentMethod: o.paymentMethod,
-      type: 'ONLINE' as const
-    }));
+    const online = onlineOrders
+      .filter(o => o.status !== 'CANCELLED')
+      .map(o => ({
+        id: o.id,
+        timestamp: o.createdAt,
+        finalAmount: o.totalAmount,
+        itemsCount: 0,
+        paymentMethod: o.paymentMethod,
+        type: 'ONLINE' as const
+      }));
 
     return [...instore, ...online].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [sales, onlineOrders]);
@@ -154,7 +160,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{currencySymbol}{stats.totalRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">All time sales</p>
+            <p className="text-xs text-muted-foreground">In-store + Delivered Online</p>
           </CardContent>
         </Card>
 

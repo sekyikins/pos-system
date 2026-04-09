@@ -273,6 +273,7 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
       discount: saleData.discount,
       final_amount: saleData.finalAmount,
       payment_method: saleData.paymentMethod,
+      payment_reference: saleData.paymentReference || null,
       promo_code: saleData.promoCode || null,
     })
     .select()

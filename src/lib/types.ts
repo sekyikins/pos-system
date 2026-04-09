@@ -50,7 +50,7 @@ export interface OnlineOrder {
   deliveryPointId: string | null;
   deliveryAddress: string | null;
   totalAmount: number;
-  paymentMethod: 'CARD' | 'MOBILE_MONEY' | 'PAY_ON_DELIVERY';
+  paymentMethod: 'PAYSTACK' | 'PAY_ON_DELIVERY';
   paymentReference: string | null;
   processedBy: string | null;
   processingStaffId: string | null;
@@ -88,7 +88,8 @@ export interface Sale {
   totalAmount: number;
   discount: number;
   finalAmount: number;
-  paymentMethod: 'CASH' | 'MOBILE_MONEY' | 'CARD';
+  paymentMethod: 'CASH' | 'PAYSTACK';
+  paymentReference?: string;
   promoCode?: string;
   status?: string;
   timestamp: string; // ISO string

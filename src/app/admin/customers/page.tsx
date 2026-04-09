@@ -311,7 +311,7 @@ export default function CustomersPage() {
                       </td>
                       <td className="p-5">
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 font-bold text-warning bg-warning/10 w-fit px-3 py-1 rounded-lg text-sm border border-warning/20">
+                          <div className="flex items-center gap-2 font-bold text-warning bg-warning/10 w-fit px-2 py-1 rounded-lg text-sm border border-warning/20">
                             <Award className="h-4 w-4" /> {c.loyalty_points || 0} pts
                           </div>
                           <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-bold">

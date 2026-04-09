@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Sale } from '@/lib/types';
 import { getSales } from '@/lib/db';
-import { Search, ShoppingBag, Banknote, CreditCard, Smartphone, Eye } from 'lucide-react';
+import { Search, ShoppingBag, Banknote, CreditCard, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useSettingsStore } from '@/lib/store';
@@ -15,8 +15,8 @@ import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
 import { TrendingUp } from 'lucide-react';
 
-const METHOD_ICON = { CASH: Banknote, CARD: CreditCard, MOBILE_MONEY: Smartphone };
-const METHOD_COLOR = { CASH: 'text-success', CARD: 'text-info', MOBILE_MONEY: 'text-warning' };
+const METHOD_ICON = { CASH: Banknote, PAYSTACK: CreditCard, PAY_ON_DELIVERY: Banknote };
+const METHOD_COLOR = { CASH: 'text-success', PAYSTACK: 'text-info', PAY_ON_DELIVERY: 'text-success' };
 
 export default function SalesPage() {
   const { currencySymbol } = useSettingsStore();
@@ -123,9 +123,8 @@ export default function SalesPage() {
               className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
             >
               <option value="ALL">All Methods</option>
+              <option value="PAYSTACK">Paystack</option>
               <option value="CASH">Cash</option>
-              <option value="CARD">Card</option>
-              <option value="MOBILE_MONEY">Mobile Money</option>
             </select>
           </div>
         </CardHeader>

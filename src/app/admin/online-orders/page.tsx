@@ -26,7 +26,7 @@ const STATUS_BADGE: Record<string, { label: string; class: string }> = {
 export default function OnlineOrdersPage() {
   const [deliveryPoints, setDeliveryPoints] = useState<Record<string, DeliveryPoint>>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('DELIVERED');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
   const [selectedOrder, setSelectedOrder] = useState<OnlineOrder | null>(null);
@@ -55,6 +55,22 @@ export default function OnlineOrdersPage() {
       const matchStatus = filterStatus === 'ALL' || o.status === filterStatus;
       return matchSearch && matchStatus;
     }), [orders, searchQuery, filterStatus]);
+
+  const revenueStats = useMemo(() => {
+    const active = orders
+      .filter(o => o.status !== 'CANCELLED')
+      .reduce((acc, o) => acc + o.totalAmount, 0);
+    const cancelled = orders
+      .filter(o => o.status === 'CANCELLED')
+      .reduce((acc, o) => acc + o.totalAmount, 0);
+    return { active, cancelled };
+  }, [orders]);
+
+  const countStats = useMemo(() => {
+    const active = orders.filter(o => o.status !== 'CANCELLED').length;
+    const cancelled = orders.filter(o => o.status === 'CANCELLED').length;
+    return { active, cancelled };
+  }, [orders]);
 
   const filteredRevenue = filtered.reduce((acc, o) => acc + o.totalAmount, 0);
   const filteredCount = filtered.length;
@@ -98,32 +114,66 @@ export default function OnlineOrdersPage() {
           ))
         ) : (
           <>
-            <Card className="border-2 border-primary/20 bg-primary/5 shadow-sm overflow-hidden group hover:border-primary/40 transition-all">
+            <Card className={`border-2 shadow-sm overflow-hidden group transition-all ${
+              filterStatus === 'CANCELLED' ? 'border-destructive/20 bg-destructive/5 hover:border-destructive/40' : 'border-primary/20 bg-primary/5 hover:border-primary/40'
+            }`}>
               <CardContent className="py-4 flex flex-col items-center justify-center relative">
-                <div className="absolute right-2 top-2 text-primary opacity-5">
+                <div className={`absolute right-2 top-2 opacity-5 ${filterStatus === 'CANCELLED' ? 'text-destructive' : 'text-primary'}`}>
                    <ShoppingBag className="h-10 w-10" />
                 </div>
-                <div className="text-xl md:text-2xl font-bold text-primary tracking-tighter tabular-nums drop-shadow-sm">
-                  {currencySymbol}{filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
+                
+                {filterStatus === 'ALL' ? (
+                  <div className="flex flex-col items-center text-center">
+                    <div className="text-xl md:text-2xl font-bold text-success tracking-tighter tabular-nums drop-shadow-sm">
+                      {currencySymbol}{revenueStats.active.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-[11px] font-bold text-destructive tracking-tight">
+                      +{currencySymbol}{revenueStats.cancelled.toLocaleString(undefined, { minimumFractionDigits: 2 })} Cancelled
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`text-xl md:text-2xl font-bold tracking-tighter tabular-nums drop-shadow-sm ${
+                    filterStatus === 'CANCELLED' ? 'text-destructive' : 'text-primary'
+                  }`}>
+                    {currencySymbol}{filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                )}
+
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
-                  <TrendingUp className="h-3 w-3 text-primary/60" />
-                  {filterStatus === 'ALL' ? 'Expected Revenue' : `${filterStatus}`}
+                  <TrendingUp className={`h-3 w-3 ${filterStatus === 'CANCELLED' ? 'text-destructive/60' : 'text-primary/60'}`} />
+                  {filterStatus === 'ALL' ? 'Cumulative Revenue' : `${filterStatus} Revenue`}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-info/20 bg-info/5 shadow-sm overflow-hidden group hover:border-info/40 transition-all">
+            <Card className={`border-2 shadow-sm overflow-hidden group transition-all ${
+              filterStatus === 'CANCELLED' ? 'border-destructive/20 bg-destructive/5 hover:border-destructive/40' : 'border-info/20 bg-info/5 hover:border-info/40'
+            }`}>
               <CardContent className="py-4 flex flex-col items-center justify-center relative">
-                <div className="absolute right-2 top-2 text-info opacity-5">
+                <div className={`absolute right-2 top-2 opacity-5 ${filterStatus === 'CANCELLED' ? 'text-destructive' : 'text-info'}`}>
                    <Truck className="h-10 w-10" />
                 </div>
-                <div className="text-xl md:text-2xl font-bold text-info tracking-tighter tabular-nums drop-shadow-sm">
-                  {filteredCount}
-                </div>
+
+                {filterStatus === 'ALL' ? (
+                  <div className="flex flex-col items-center text-center">
+                    <div className="text-xl md:text-2xl font-bold text-info tracking-tighter tabular-nums drop-shadow-sm">
+                      {countStats.active}
+                    </div>
+                    <div className="text-[11px] font-bold text-destructive tracking-tight">
+                      +{countStats.cancelled} Cancelled
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`text-xl md:text-2xl font-bold tracking-tighter tabular-nums drop-shadow-sm ${
+                    filterStatus === 'CANCELLED' ? 'text-destructive' : 'text-info'
+                  }`}>
+                    {filteredCount}
+                  </div>
+                )}
+
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
-                  <ShoppingBag className="h-3 w-3 text-info/60" />
-                  {filterStatus === 'ALL' ? 'Total Orders' : 'Count'}
+                  <ShoppingBag className={`h-3 w-3 ${filterStatus === 'CANCELLED' ? 'text-destructive/60' : 'text-info/60'}`} />
+                  {filterStatus === 'ALL' ? 'Total Order Volume' : `${filterStatus} Count`}
                 </p>
               </CardContent>
             </Card>
@@ -144,10 +194,10 @@ export default function OnlineOrdersPage() {
               className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-card text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer shadow-sm"
             >
               <option value="ALL">All Statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="SHIPPED">Shipped</option>
               <option value="DELIVERED">Delivered</option>
+              <option value="SHIPPED">Shipped</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="PENDING">Pending</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
           </div>

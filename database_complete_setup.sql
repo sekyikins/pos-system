@@ -118,7 +118,8 @@ CREATE TABLE public.sales (
     total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
     discount NUMERIC(10, 2) DEFAULT 0 CHECK (discount >= 0),
     final_amount NUMERIC(10, 2) NOT NULL CHECK (final_amount >= 0),
-    payment_method TEXT NOT NULL CHECK (payment_method IN ('CASH', 'MOBILE_MONEY', 'CARD')),
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('CASH', 'PAYSTACK')),
+    payment_reference TEXT,
     promo_code TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
@@ -140,7 +141,7 @@ CREATE TABLE public.payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sale_id UUID NOT NULL REFERENCES public.sales(id) ON DELETE CASCADE,
     amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
-    method TEXT NOT NULL CHECK (method IN ('CASH', 'MOBILE_MONEY', 'CARD')),
+    method TEXT NOT NULL CHECK (method IN ('CASH', 'PAYSTACK')),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
@@ -166,8 +167,8 @@ CREATE TABLE public.online_orders (
     total_amount NUMERIC(10,2) NOT NULL CHECK (total_amount >= 0),
     status TEXT NOT NULL DEFAULT 'PENDING'
         CHECK (status IN ('PENDING','CONFIRMED','SHIPPED','DELIVERED','CANCELLED')),
-    payment_method TEXT NOT NULL DEFAULT 'CARD'
-        CHECK (payment_method IN ('CARD','MOBILE_MONEY','PAY_ON_DELIVERY')),
+    payment_method TEXT NOT NULL DEFAULT 'PAYSTACK'
+        CHECK (payment_method IN ('PAYSTACK','PAY_ON_DELIVERY')),
     payment_reference TEXT,
     promo_name TEXT,
     -- Processing fields for POS integration

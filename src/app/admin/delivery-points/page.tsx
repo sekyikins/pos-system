@@ -170,7 +170,7 @@ export default function DeliveryPointsPage() {
                         )}
                       </td>
                       <td className="p-5 text-right">
-                        <div className="flex justify-around gap-2 pr-4">
+                        <div className="flex justify-end gap-2">
                            <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20" onClick={() => handleEditOpen(p)}>
                             <Edit className="h-4.5 w-4.5" />
                           </Button>

@@ -192,7 +192,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
 
             {/* Customer Search / Quick Add Modal-ish Overlay */}
             {isCustomerSearchOpen && (
-              <div className="absolute inset-x-0 top-[60px] bottom-0 z-30 bg-card flex flex-col animate-in slide-in-from-top duration-200">
+              <div className="absolute inset-x-0 top-15 bottom-0 z-30 bg-card flex flex-col animate-in slide-in-from-top duration-200">
                 <div className="p-4 border-b border-border flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm">Customer Lookup</h3>
