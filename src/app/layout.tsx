@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import { LayoutContent } from '@/components/layout/LayoutContent';
 
@@ -27,6 +28,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className}`} suppressHydrationWarning>
         <LayoutContent>{children}</LayoutContent>
+        <Script 
+          src="https://js.paystack.co/v1/inline.js" 
+          strategy="beforeInteractive"
+        />
       </body>
     </html>
   );

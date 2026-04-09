@@ -37,7 +37,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const { currencySymbol, currency } = useSettingsStore();
   const { user } = useAuth();
   
-  const paystackInitializeRef = React.useRef<((options: Record<string, unknown>) => void) | null>(null);
+  const paystackInitializeRef = React.useRef<((options: { onSuccess?: (res: { reference: string }) => void; onClose?: () => void }) => void) | null>(null);
 
   const [method, setMethod] = useState<'CASH' | 'PAYSTACK'>('CASH');
   const [amountGiven, setAmountGiven] = useState('');
