@@ -15,8 +15,8 @@ import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
 import { TrendingUp } from 'lucide-react';
 
-const METHOD_ICON = { CASH: Banknote, PAYSTACK: CreditCard, PAY_ON_DELIVERY: Banknote };
-const METHOD_COLOR = { CASH: 'text-success', PAYSTACK: 'text-info', PAY_ON_DELIVERY: 'text-success' };
+const METHOD_ICON: Record<string, React.ElementType> = { CASH: Banknote, PAYSTACK: CreditCard, PAY_ON_DELIVERY: Banknote };
+const METHOD_COLOR: Record<string, string> = { CASH: 'text-success', PAYSTACK: 'text-info', PAY_ON_DELIVERY: 'text-success' };
 
 export default function SalesPage() {
   const { currencySymbol } = useSettingsStore();
@@ -33,9 +33,9 @@ export default function SalesPage() {
 
   const filtered = sales.filter(s => {
     const matchSearch = s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        s.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        s.paymentMethodId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         s.cashierId.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchMethod = filterMethod === 'ALL' || s.paymentMethod === filterMethod;
+    const matchMethod = filterMethod === 'ALL' || s.paymentMethodId === filterMethod;
     return matchSearch && matchMethod;
   });
 
@@ -153,21 +153,26 @@ export default function SalesPage() {
                     <th className="px-6 py-4">Method</th>
                     <th className="px-6 py-4">Adjustment</th>
                     <th className="px-6 py-4">Total</th>
-                    <th className="px-6 py-4">View</th>
+                    <th className="px-6 py-4 text-right">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {filtered.length === 0 ? (
                     <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground font-medium italic">No transactions detected.</td></tr>
                   ) : filtered.map(sale => {
-                    const Icon = METHOD_ICON[sale.paymentMethod] ?? ShoppingBag;
-                    const color = METHOD_COLOR[sale.paymentMethod] ?? '';
+                    const Icon = METHOD_ICON[sale.paymentMethodId] ?? ShoppingBag;
+                    const color = METHOD_COLOR[sale.paymentMethodId] ?? '';
                     return (
                       <tr key={sale.id} className="hover:bg-primary/5 transition-all group">
                         <td className="p-5">
                            <span className="font-mono text-[14px] font-bold bg-muted/50 px-2 py-0.5 rounded tracking-tighter">
                              #{sale.id.slice(-8).toUpperCase()}
                            </span>
+                           {sale.is_returned && (
+                             <span className="ml-2 px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-bold text-[10px]">
+                               RETURNED
+                             </span>
+                           )}
                         </td>
                         <td className="p-5 text-muted-foreground/80 font-bold text-xs">{new Date(sale.timestamp).toLocaleString()}</td>
                         <td className="p-5">
@@ -176,7 +181,7 @@ export default function SalesPage() {
                         <td className="p-5">
                           <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-tight ${color}`}>
                             <Icon className="h-3.5 w-3.5" />
-                            {sale.paymentMethod.replace('_', ' ')}
+                            {sale.paymentMethodId?.replace('_', ' ')}
                           </div>
                         </td>
                         <td className="p-5">
@@ -210,7 +215,7 @@ export default function SalesPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{new Date(selectedSale.timestamp).toLocaleString()}</span></div>
-              <div><span className="text-muted-foreground">Method:</span> <span className="font-medium">{selectedSale.paymentMethod.replace('_', ' ')}</span></div>
+              <div><span className="text-muted-foreground">Method:</span> <span className="font-medium">{selectedSale.paymentMethodId?.replace('_', ' ')}</span></div>
               <div><span className="text-muted-foreground">Cashier ID:</span> <span className="font-mono text-xs">{selectedSale.cashierId.slice(-8)}</span></div>
             </div>
             <div className="border border-border rounded-xl overflow-hidden">

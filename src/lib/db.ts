@@ -3,10 +3,17 @@
  * Replaces mock-db.ts — all data operations go through Supabase.
  */
 import { supabase } from './supabase';
-import { Product, Sale, SalesItem, InventoryLog, StaffRecord, Customer } from './types';
+import { Product, Sale, TransactionItem, InventoryLog, StaffRecord, Customer, Role } from './types';
 import bcrypt from 'bcryptjs';
 
 // ─── Type Helpers ────────────────────────────────────────────────────────────
+export const generateReference = (method: string): string => {
+  if (method === 'PAYSTACK') {
+    return Array.from({ length: 13 }, () => Math.floor(Math.random() * 10)).join('');
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return Array.from({ length: 13 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+};
 
 /** Map Supabase snake_case row → Product */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,11 +26,13 @@ function toProduct(row: any): Product {
     categoryId: row.category_id || row.category,
     category: row.categories?.name || row.category || 'Uncategorized',
     price: Number(row.price || 0),
+    costPrice: Number(row.cost_price || 0),
     quantity: Number(row.quantity || 0),
     // Map from product_images table join
     image_url: Array.isArray(row.product_images) ? row.product_images[0]?.image_url : (row.image_url || undefined),
     supplierId: supplierInfo?.supplier_id || undefined,
     supplierName: supplierInfo?.suppliers?.name || undefined,
+    is_returnable: row.is_returnable,
   };
 }
 
@@ -36,25 +45,31 @@ function toSale(row: any): Sale {
     id: row.id,
     cashierId: row.cashier_id,
     customerId: row.customer_id,
-    items: Array.isArray(row.sales_items) ? row.sales_items.map(toSalesItem) : [],
+    items: Array.isArray(row.transaction_items) ? row.transaction_items.map(toTransactionItem) : [],
     totalAmount: Number(row.total_amount || 0),
     discount: Number(row.discount || 0),
     finalAmount: Number(row.final_amount || 0),
-    paymentMethod: row.payment_method,
-    promoCode: row.promo_code || undefined,
+    paymentMethodId: row.payment_method_id,
+    paymentReference: row.payment_reference || undefined,
+    promotionId: row.promotion_id || undefined,
+    promoName: row.promotions?.name || undefined,
     timestamp: row.created_at,
+    is_returned: row.is_returned,
   };
 }
 
-/** Map Supabase snake_case row → SalesItem */
+/** Map Supabase snake_case row → TransactionItem */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toSalesItem(row: any): SalesItem {
-  if (!row) return {} as SalesItem;
+function toTransactionItem(row: any): TransactionItem {
+  if (!row) return {} as TransactionItem;
   return {
     id: row.id,
+    saleId: row.sale_id,
+    orderId: row.order_id,
     productId: row.product_id,
-    productName: row.product_name,
+    productName: row.products?.name, // From join
     price: Number(row.price || 0),
+    costPrice: Number(row.cost_price || 0),
     quantity: row.quantity || 0,
     subtotal: Number(row.subtotal || 0),
   };
@@ -73,6 +88,8 @@ function toInventoryLog(row: any): InventoryLog {
     supplierName: row.suppliers?.name || undefined,
     staffId: row.staff_id || undefined,
     staffName: row.pos_staff?.name || undefined,
+    customerId: row.customer_id || undefined,
+    customerName: row.customers?.name || undefined,
   };
 }
 
@@ -107,7 +124,7 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
   return toProduct(data);
 }
 
-export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Promise<Product> {
+export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File, staffId?: string): Promise<Product> {
   const { data: productRow, error: productErr } = await supabase
     .from('products')
     .insert({ 
@@ -115,8 +132,10 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Prom
       category_id: p.categoryId || null, 
       category: p.category, 
       price: p.price, 
+      cost_price: p.costPrice || 0,
       quantity: p.quantity, 
-      barcode: p.barcode 
+      barcode: p.barcode,
+      is_returnable: p.is_returnable ?? true
     })
     .select()
     .single();
@@ -161,20 +180,24 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File): Prom
       product_id: product.id,
       change: product.quantity,
       reason: 'RESTOCK',
+      staff_id: staffId || null,
+      supplier_id: product.supplierId || null
     });
   }
 
   return product;
 }
 
-export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | string, imageFile?: File, supplierId?: string, staffId?: string): Promise<Product | null> {
+export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | string, imageFile?: File, supplierId?: string, staffId?: string, customerId?: string): Promise<Product | null> {
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
   if (updates.category !== undefined) row.category = updates.category;
   if (updates.price !== undefined) row.price = updates.price;
+  if (updates.costPrice !== undefined) row.cost_price = updates.costPrice;
   if (updates.quantity !== undefined) row.quantity = updates.quantity;
   if (updates.barcode !== undefined) row.barcode = updates.barcode;
+  if (updates.is_returnable !== undefined) row.is_returnable = updates.is_returnable;
 
   const { data: oldProd } = await supabase.from('products').select('quantity').eq('id', id).single();
 
@@ -225,7 +248,8 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
         change: diff,
         reason: logReason,
         supplier_id: supplierId || null,
-        staff_id: staffId || null
+        staff_id: staffId || null,
+        customer_id: customerId || null
       });
       if (logErr) console.error('Inventory Log Error:', logErr);
     }
@@ -246,7 +270,7 @@ export async function deleteProduct(id: string): Promise<void> {
 export async function getSales(): Promise<Sale[]> {
   const { data, error } = await supabase
     .from('sales')
-    .select('*, sales_items(*)')
+    .select('*, transaction_items(*, products(name)), promotions(name)')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toSale);
@@ -255,7 +279,7 @@ export async function getSales(): Promise<Sale[]> {
 export async function getSaleById(id: string): Promise<Sale | null> {
   const { data, error } = await supabase
     .from('sales')
-    .select('*, sales_items(*)')
+    .select('*, transaction_items(*, products(name)), promotions(name)')
     .eq('id', id)
     .single();
   if (error) return null;
@@ -272,53 +296,50 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
       total_amount: saleData.totalAmount,
       discount: saleData.discount,
       final_amount: saleData.finalAmount,
-      payment_method: saleData.paymentMethod,
-      payment_reference: saleData.paymentReference || null,
-      promo_code: saleData.promoCode || null,
+      payment_method_id: saleData.paymentMethodId,
+      payment_reference: saleData.paymentReference || generateReference(saleData.paymentMethodId),
+      promotion_id: saleData.promotionId || null,
     })
     .select()
     .single();
-  if (saleErr) {
-    console.error('Sale Insert Error:', saleErr);
-    throw saleErr;
-  }
+  if (saleErr) throw saleErr;
 
   const saleId = saleRow.id;
 
-  // 2. Insert sales_items
+  // 2. Insert transaction_items
   const itemRows = saleData.items.map(item => ({
     sale_id: saleId,
     product_id: item.productId,
-    product_name: item.productName,
     price: item.price,
+    cost_price: item.costPrice || 0,
     quantity: item.quantity,
     subtotal: item.subtotal,
   }));
-  const { error: itemsErr } = await supabase.from('sales_items').insert(itemRows);
+  const { error: itemsErr } = await supabase.from('transaction_items').insert(itemRows);
   if (itemsErr) throw itemsErr;
 
   // 3. Record payment
   const { error: paymentErr } = await supabase.from('payments').insert({
     sale_id: saleId,
     amount: saleData.finalAmount,
-    method: saleData.paymentMethod,
+    payment_method_id: saleData.paymentMethodId,
   });
   if (paymentErr) throw paymentErr;
 
-  // 4. Update product stock (logging handled inside updateProduct)
+  // 4. Update product stock
   for (const item of saleData.items) {
     const product = await getProductById(item.productId);
     if (product) {
       const newQty = product.quantity - item.quantity;
-      await updateProduct(item.productId, { quantity: Math.max(0, newQty) }, 'SALE');
+      await updateProduct(item.productId, { quantity: Math.max(0, newQty) }, 'SALE', undefined, undefined, saleData.cashierId, saleData.customerId);
     }
   }
 
-  // 5. Update Loyalty Points (50 pts per purchase day)
+  // 5. Update Loyalty Points
   if (saleData.customerId) {
     const { data: customer } = await supabase
-      .from('customer')
-      .select('loyalty_points, last_purchase_date, order_count')
+      .from('customers')
+      .select('loyalty_points, last_purchase_date, order_count, type')
       .eq('id', saleData.customerId)
       .single();
 
@@ -327,6 +348,12 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
       const lastDate = customer.last_purchase_date;
       const orderCount = Number(customer.order_count || 0);
       let newPoints = Number(customer.loyalty_points || 0);
+      let newType = customer.type;
+
+      // Upgrade type if they were only ONLINE
+      if (customer.type === 'ONLINE') {
+        newType = 'BOTH';
+      }
       
       if (lastDate !== today) {
         newPoints += 50;
@@ -334,19 +361,20 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
         newPoints += 10;
       }
 
-      await supabase.from('customer').update({ 
+      await supabase.from('customers').update({ 
         loyalty_points: newPoints,
         last_purchase_date: today,
-        order_count: orderCount + 1
+        order_count: orderCount + 1,
+        type: newType
       }).eq('id', saleData.customerId);
     }
   }
 
   // 6. Update promo usage count
-  if (saleData.promoCode) {
-    const { data: promo } = await supabase.from('promotions').select('id, usage_count').eq('code', saleData.promoCode).single();
+  if (saleData.promotionId) {
+    const { data: promo } = await supabase.from('promotions').select('usage_count').eq('id', saleData.promotionId).single();
     if (promo) {
-      await supabase.from('promotions').update({ usage_count: (promo.usage_count || 0) + 1 }).eq('id', promo.id);
+      await supabase.from('promotions').update({ usage_count: (promo.usage_count || 0) + 1 }).eq('id', saleData.promotionId);
     }
   }
 
@@ -359,20 +387,19 @@ export async function processSale(saleData: Omit<Sale, 'id' | 'timestamp'>): Pro
 export async function getInventoryLogs(): Promise<InventoryLog[]> {
   const { data, error } = await supabase
     .from('inventory')
-    .select('*, suppliers(name), pos_staff(name)')
+    .select('*, suppliers(name), pos_staff(name), customers(name)')
     .order('timestamp', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toInventoryLog);
 }
 
-export async function adjustInventory(productId: string, change: number, reason: InventoryLog['reason'], supplierId?: string, staffId?: string): Promise<void> {
+export async function adjustInventory(productId: string, change: number, reason: InventoryLog['reason'], supplierId?: string, staffId?: string, customerId?: string): Promise<void> {
   const product = await getProductById(productId);
   if (!product) throw new Error('Product not found');
   const newQty = product.quantity + change;
   if (newQty < 0) throw new Error('Stock cannot be negative');
   
-  // Update product stock and let updateProduct handle the log
-  await updateProduct(productId, { quantity: newQty }, reason, undefined, supplierId, staffId);
+  await updateProduct(productId, { quantity: newQty }, reason, undefined, supplierId, staffId, customerId);
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -387,7 +414,7 @@ export async function getUsers(): Promise<StaffRecord[]> {
     id: row.id,
     name: row.name,
     username: row.username,
-    role: row.role,
+    role: row.role as Role,
     passwordHash: row.password_hash,
     createdAt: row.created_at,
   }));
@@ -404,7 +431,7 @@ export async function getUserByUsername(username: string): Promise<StaffRecord |
     id: data.id,
     name: data.name,
     username: data.username,
-    role: data.role,
+    role: data.role as Role,
     passwordHash: data.password_hash,
     createdAt: data.created_at,
   };
@@ -426,7 +453,7 @@ export async function addUser(newUser: Omit<StaffRecord, 'id' | 'createdAt'>): P
     id: data.id, 
     name: data.name, 
     username: data.username, 
-    role: data.role, 
+    role: data.role as Role, 
     passwordHash: data.password_hash,
     createdAt: data.created_at
   };
@@ -449,56 +476,90 @@ export async function deleteUser(id: string): Promise<void> {
 export async function getPayments() {
   const { data, error } = await supabase
     .from('payments')
-    .select('*, sales(cashier_id, customer_id, created_at)')
-    .order('timestamp', { ascending: false });
+    .select('*, sales(cashier_id, customer_id, created_at), online_orders(customer_id, created_at)')
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
 
-// ─── POS CUSTOMERS ─────────────────────────────────────────────────────────────
-export async function getPosCustomers(): Promise<Customer[]> {
-  const { data, error } = await supabase.from('customer').select('*').order('name');
-  if (error) throw error;
-  return (data || []).map(c => ({ ...c, type: 'POS' }));
-}
-
+// ─── Unified CUSTOMERS ─────────────────────────────────────────────────────────────
 export async function getAllCustomers(): Promise<Customer[]> {
-  const { data: pos, error: posErr } = await supabase.from('customer').select('*').order('name');
-  if (posErr) throw posErr;
+  const { data, error } = await supabase.from('customers').select('*').order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getPosCustomers(): Promise<Customer[]> {
+  const { data, error } = await supabase.from('customers').select('*').in('type', ['IN_STORE', 'BOTH']).order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getCustomerById(id: string): Promise<Customer | null> {
+  const { data, error } = await supabase.from('customers').select('*').eq('id', id).maybeSingle();
+  if (error) return null;
+  return data;
+}
+
+export async function addPosCustomer(customer: Omit<Customer, 'id' | 'created_at' | 'loyalty_points' | 'type'>) {
+  const email = customer.email?.toLowerCase();
+  const phone = customer.phone;
+
+  // 1. Check if user already exists by email or phone
+  let query = supabase.from('customers').select('*');
   
-  const { data: eco, error: ecoErr } = await supabase.from('e_customer').select('id, name, phone, email, loyalty_points, created_at');
-  if (ecoErr) throw ecoErr;
+  if (email && phone) {
+    query = query.or(`email.eq.${email},phone.eq.${phone}`);
+  } else if (email) {
+    query = query.eq('email', email);
+  } else if (phone) {
+    query = query.eq('phone', phone);
+  } else {
+    // No identifier provided, just insert as new
+    const { data, error } = await supabase.from('customers').insert({ ...customer, type: 'IN_STORE', loyalty_points: 0 }).select().single();
+    if (error) throw error;
+    return data;
+  }
 
-  const merged: Customer[] = [
-    ...(pos || []).map(c => ({ ...c, type: 'POS' as const })),
-    ...(eco || []).map(c => ({ 
-      id: c.id, 
-      name: c.name, 
-      phone: c.phone || undefined, 
-      email: c.email || undefined, 
-      loyalty_points: c.loyalty_points, 
-      created_at: c.created_at,
-      type: 'ECOMMERCE' as const 
-    }))
-  ];
-  return merged;
-}
+  const { data: existing } = await query.maybeSingle();
 
-export async function addPosCustomer(customer: Omit<Customer, 'id' | 'created_at' | 'loyalty_points'>) {
-  const { data, error } = await supabase.from('customer').insert({ ...customer, loyalty_points: 0 }).select().single();
+  if (existing) {
+    if (existing.type === 'ONLINE') {
+      // UPGRADE: Link this online user to the store
+      const { data, error } = await supabase
+        .from('customers')
+        .update({ 
+          name: customer.name || existing.name,
+          phone: phone || existing.phone,
+          email: email || existing.email,
+          type: 'BOTH' 
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } else {
+      // Already IN_STORE or BOTH, just return existing
+      return existing;
+    }
+  }
+
+  // 2. New POS customer
+  const { data, error } = await supabase.from('customers').insert({ ...customer, type: 'IN_STORE', loyalty_points: 0 }).select().single();
   if (error) throw error;
-  return { ...data, type: 'POS' };
+  return data;
 }
 
-export async function updatePosCustomer(id: string, updates: Partial<Customer>) {
-  const { error } = await supabase.from('customer').update(updates).eq('id', id);
+export async function updateCustomer(id: string, updates: Partial<Customer>) {
+  const { error } = await supabase.from('customers').update(updates).eq('id', id);
   if (error) throw error;
 }
 
-export async function deletePosCustomer(id: string) {
-  const { error } = await supabase.from('customer').delete().eq('id', id);
+export async function deleteCustomer(id: string) {
+  const { error } = await supabase.from('customers').delete().eq('id', id);
   if (error) throw error;
 }
 
 export * from './db_extended';
-

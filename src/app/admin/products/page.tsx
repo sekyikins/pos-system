@@ -14,6 +14,7 @@ import { Plus, Search, Edit, Trash2, Loader2, Upload, ImageIcon, Boxes, Barcode,
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
+import { useAuth } from '@/lib/auth';
 
 export default function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -34,17 +35,20 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '', // Using this for both display name and selection logic in datalists
     category: '',
     price: '',
+    costPrice: '',
     quantity: '',
     barcode: '',
     description: '',
     supplierId: '',
     supplierName: '',
+    is_returnable: true,
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -101,18 +105,20 @@ export default function ProductsPage() {
         categoryId: product.category, // In your datalist implementation, category name is used
         category: product.category,
         price: product.price.toString(),
+        costPrice: product.costPrice.toString(),
         quantity: product.quantity.toString(),
         barcode: product.barcode,
         description: product.description || '',
         supplierId: product.supplierId || '',
         supplierName: product.supplierName || '',
+        is_returnable: product.is_returnable ?? true,
       });
       setPreviewUrl(product.image_url || null);
     } else {
       setEditingProduct(null);
       setFormData({
-        name: '', categoryId: '', category: '', price: '', quantity: '',
-        barcode: '', description: '', supplierId: '', supplierName: '',
+        name: '', categoryId: '', category: '', price: '', costPrice: '', quantity: '',
+        barcode: '', description: '', supplierId: '', supplierName: '', is_returnable: true,
       });
       setPreviewUrl(null);
       setSelectedFile(null);
@@ -167,16 +173,18 @@ export default function ProductsPage() {
       const submissionData = {
         ...formData,
         categoryId: selectedCat?.id || undefined,
-        category: formData.categoryId, // Ensure the name matches the datalist input
+        category: formData.categoryId, 
         price: Number(formData.price),
+        costPrice: Number(formData.costPrice || 0),
         quantity: Number(formData.quantity),
+        is_returnable: formData.is_returnable,
       };
 
       if (editingProduct) {
-        await updateProduct(editingProduct.id, submissionData, undefined, selectedFile || undefined);
+        await updateProduct(editingProduct.id, submissionData, undefined, selectedFile || undefined, undefined, user?.id);
         addToast('Product updated', 'success');
       } else {
-        await addProduct(submissionData, selectedFile || undefined);
+        await addProduct(submissionData, selectedFile || undefined, user?.id);
         addToast('Product added', 'success');
       }
       setIsModalOpen(false);
@@ -286,8 +294,9 @@ export default function ProductsPage() {
                   <tr>
                     <th className="p-5">Product</th>
                     <th className="p-5">Category</th>
+                    <th className="p-5">Cost</th>
                     <th className="p-5">Price</th>
-                    <th className="p-5">Stock Status</th>
+                    <th className="p-5 text-center">Stock</th>
                     <th className="p-5">Supplier</th>
                     <th className="p-5">Barcode</th>
                     <th className="p-5 text-center">Actions</th>
@@ -319,17 +328,20 @@ export default function ProductsPage() {
                             {product.category}
                           </Badge>
                         </td>
+                        <td className="p-3 font-semibold text-muted-foreground/70">
+                          {currencySymbol}{(product.costPrice || 0).toFixed(2)}
+                        </td>
                         <td className="p-3 font-bold text-base text-primary">
-                          {currencySymbol}{product.price.toFixed(2)}
+                          {currencySymbol}{(product.price || 0).toFixed(2)}
                         </td>
                         <td className="p-3">
-                            <div className="flex justify-center">
+                            <div className="flex justify-center whitespace-nowrap gap-1 items-center">
                               {product.quantity === 0 ? (
-                              <Badge variant="destructive" className="px-2.5 py-1 text-[15px] font-bold">{product.quantity}</Badge>
+                              <Badge variant="destructive" className="px-2.5 py-1 text-[13px] font-bold">{product.quantity}</Badge>
                             ) : product.quantity <= 10 ? (
-                              <Badge variant="destructive" className="px-2.5 py-1 text-[15px] font-bold bg-orange-500 hover:bg-orange-600">{product.quantity}</Badge>
+                              <Badge variant="destructive" className="px-2.5 py-1 text-[13px] font-bold bg-orange-500 hover:bg-orange-600">{product.quantity}</Badge>
                             ) : (
-                              <Badge className="px-2.5 py-1 text-[15px] font-bold bg-success text-white hover:bg-success/90">{product.quantity}</Badge>
+                              <Badge className="px-2.5 py-1 text-[13px] font-bold bg-success text-white hover:bg-success/90">{product.quantity}</Badge>
                             )}
                             </div>
                         </td>
@@ -455,11 +467,24 @@ export default function ProductsPage() {
               </div>
 
               <Input 
-                label={`Price (${currencySymbol})`} 
+                label={`Cost (${currencySymbol})`} 
                 type="number" 
                 step="0.01" 
                 min="0" 
                 className="rounded-xl h-11"
+                placeholder="Purchase cost..."
+                value={formData.costPrice} 
+                onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })} 
+                required 
+              />
+
+              <Input 
+                label={`Price (${currencySymbol})`} 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                className="rounded-xl h-11 border-primary/20 bg-primary/5"
+                placeholder="Selling price..."
                 value={formData.price} 
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })} 
                 required 
@@ -470,29 +495,43 @@ export default function ProductsPage() {
                 type="number" 
                 min="0" 
                 className="rounded-xl h-11"
+                placeholder="Starting quantity..."
                 value={formData.quantity} 
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} 
                 required 
                 disabled={!!editingProduct}
               />
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 px-1">
+                  <Barcode className="h-3.5 w-3.5" /> Identifier / Barcode
+                </label>
+                <Input 
+                  placeholder="EAN/UPC or unique SKU..."
+                  className="rounded-xl h-11 font-mono tracking-widest"
+                  value={formData.barcode} 
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} 
+                  required 
+                />
+              </div>
               
-              <div className="md:col-span-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 px-1">
-                    <Barcode className="h-3.5 w-3.5" /> Identifier / Barcode
-                  </label>
-                  <Input 
-                    placeholder="Enter EAN/UPC or unique SKU..."
-                    className="rounded-xl h-11 font-mono tracking-widest"
-                    value={formData.barcode} 
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} 
-                    required 
+              <div className="md:col-span-2 pt-2 border-t border-border">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 rounded border-border text-primary focus:ring-primary/30"
+                    checked={formData.is_returnable}
+                    onChange={(e) => setFormData({ ...formData, is_returnable: e.target.checked })}
                   />
-                </div>
+                  <div>
+                    <p className="font-bold text-sm tracking-tight">Returnable Item</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Allow customers to return this item.</p>
+                  </div>
+                </label>
               </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t border-border mt-6">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border mt-2">
             <Button type="button" variant="outline" onClick={handleCloseModal} disabled={isSaving} className="rounded-xl font-bold">Discard</Button>
             <Button 
               type="submit" 

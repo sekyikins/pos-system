@@ -84,17 +84,17 @@ export function OnlineOrdersList() {
 
   // ── Derived lists ─────────────────────────────────────────────────
   const activeOrders = useMemo(
-    () => orders.filter(o => o.status === 'PENDING' && !o.processingStaffId),
+    () => orders.filter(o => o.status === 'PENDING' && !o.startProcessStaffId),
     [orders]
   );
   const processingOrders = useMemo(
-    () => orders.filter(o => (o.status === 'CONFIRMED' || o.status === 'SHIPPED') && o.processingStaffId),
+    () => orders.filter(o => (o.status === 'CONFIRMED' || o.status === 'SHIPPED') && o.startProcessStaffId),
     [orders]
   );
   const historyOrders = useMemo(
     () => orders.filter(o =>
       (o.status === 'DELIVERED' || o.status === 'CANCELLED') &&
-      (o.processedBy === user?.id || user?.role === 'ADMIN' || user?.role === 'MANAGER')
+      (o.endProcessStaffId === user?.id || user?.role === 'ADMIN' || user?.role === 'MANAGER')
     ),
     [orders, user]
   );
@@ -239,8 +239,8 @@ interface OrderCardProps {
 function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, currencySymbol, onStart, onUpdate }: OrderCardProps) {
   const meta = STATUS_MAP[order.status] || { label: order.status, color: 'bg-muted text-muted-foreground', icon: Package };
   const StatusIcon = meta.icon;
-  const isBeingProcessedByMe = order.processingStaffId === currentUser?.id;
-  const processingStaff = staff.find((s: StaffRecord) => s.id === order.processingStaffId);
+  const isBeingProcessedByMe = order.startProcessStaffId === currentUser?.id;
+  const processingStaff = staff.find((s: StaffRecord) => s.id === order.startProcessStaffId);
 
   return (
     <Card className="overflow-hidden border-2 border-border/50 hover:border-primary/30 transition-all shadow-sm flex flex-col h-full bg-card">
@@ -261,7 +261,7 @@ function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, curr
             <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Total Amount</p>
             <p className="text-2xl sm:text-3xl font-bold text-primary">{currencySymbol}{order.totalAmount.toFixed(2)}</p>
             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
-              <Badge variant="secondary" className="text-[10px] uppercase font-bold">{order.paymentMethod.replace(/_/g, ' ')}</Badge>
+              <Badge variant="secondary" className="text-[10px] uppercase font-bold">{order.paymentMethodId.replace(/_/g, ' ')}</Badge>
             </div>
           </div>
 
@@ -275,7 +275,7 @@ function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, curr
                 </p>
               </div>
             </div>
-            {order.processingStaffId && (
+            {order.startProcessStaffId && (
               <div className="flex items-center gap-2 pt-2 border-t border-border/50">
                 <User className="h-3.5 w-3.5 text-info" />
                 <p className="text-xs font-medium">

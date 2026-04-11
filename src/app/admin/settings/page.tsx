@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Settings, UserCog, Truck, MapPin, Ticket, LayoutGrid, Store, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { DataExporter } from '@/components/admin/DataExporter';
 
 export default function SettingsHubPage() {
   const { user } = useAuth();
@@ -62,8 +63,8 @@ export default function SettingsHubPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        <Card className="border-2 border-border/50 shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
-          <CardHeader className="bg-muted/30 border-b border-border/50 pb-6 pt-8 px-8">
+        <Card className="border-2 border-primary/20 shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
+          <CardHeader className="bg-primary/10 border-b border-primary/10 pb-6 pt-8 px-8">
             <div className="flex items-center gap-3 text-xl font-bold uppercase tracking-widest text-foreground">
               <LayoutGrid className="h-6 w-6 text-primary" />
               Management Modules
@@ -92,6 +93,13 @@ export default function SettingsHubPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Financial & Data Export Section */}
+        {user?.role === 'ADMIN' && (
+          <div className="transition-all animate-in slide-in-from-bottom-5 duration-700 delay-300">
+            <DataExporter />
+          </div>
+        )}
         
         <Card className="bg-muted/20 border-dashed border-2 border-border/50 shadow-none">
           <CardContent className="p-6 flex flex-col items-center text-center space-y-3">

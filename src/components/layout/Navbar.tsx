@@ -198,7 +198,7 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
           </div>
           
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+            <Button variant="outline" autoFocus onClick={() => setShowLogoutConfirm(false)}>
               Cancel
             </Button>
             <Button variant="danger" onClick={logout}>

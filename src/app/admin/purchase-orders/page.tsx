@@ -13,6 +13,7 @@ import { getPurchaseOrders, addPurchaseOrder, updatePurchaseOrderStatus, getProd
 import { useToastStore, useSettingsStore } from '@/lib/store';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
+import { useAuth } from '@/lib/auth';
 
 type NewPurchaseOrderItem = Omit<PurchaseOrderItem, 'id' | 'poId' | 'subtotal' | 'createdAt' | 'productName'>;
 
@@ -27,6 +28,7 @@ export default function PurchaseOrdersPage() {
   
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
+  const { user } = useAuth();
 
   const { data: purchaseOrders, isLoading, connectionStatus, refetch } = useRealtimeTable<PurchaseOrder>({
     table: 'purchase_orders',
@@ -62,7 +64,7 @@ export default function PurchaseOrdersPage() {
     });
   }, [purchaseOrders, searchQuery, filterStatus]);
 
-  const filteredRevenue = filteredOrders.reduce((sum, po) => sum + po.totalAmount, 0);
+  const filteredRevenue = filteredOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
   const filteredCount = filteredOrders.length;
 
   const handleCreatePO = async (e: React.FormEvent) => {
@@ -104,7 +106,7 @@ export default function PurchaseOrdersPage() {
     if (!window.confirm(`Are you sure you want to ${verb} this order?`)) return;
 
     try {
-      await updatePurchaseOrderStatus(id, status);
+      await updatePurchaseOrderStatus(id, status, user?.id);
       addToast(`Order ${status.toLowerCase()}`, 'success');
       refetch();
       if (selectedPO?.id === id) setSelectedPO(null);
@@ -126,7 +128,12 @@ export default function PurchaseOrdersPage() {
     if (field === 'productId') {
       newItems[index].productId = value as string;
       const prod = products.find(p => p.id === value);
-      if (prod) newItems[index].unitCost = Number((prod.price * 0.7).toFixed(2));
+      if (prod) {
+        // Use existing cost price if available, else fallback to 70% estimate
+        newItems[index].unitCost = prod.costPrice > 0 
+          ? prod.costPrice 
+          : Number((prod.price * 0.7).toFixed(2));
+      }
     } else {
       let val = 0;
       if (field === 'quantity') {
@@ -163,7 +170,6 @@ export default function PurchaseOrdersPage() {
         </div>
       </div>
 
-      {/* Dynamic Summary Stats - Compact */}
       <div className="grid grid-cols-2 gap-4">
         {isLoading ? (
           [...Array(2)].map((_, i) => (
@@ -297,7 +303,7 @@ export default function PurchaseOrdersPage() {
                             </Badge>
                           </td>
                           <td className="p-5 text-right font-bold text-base text-primary">
-                            {currencySymbol}{po.totalAmount.toFixed(2)}
+                            {currencySymbol}{(po.totalAmount || 0).toFixed(2)}
                           </td>
                         </tr>
                       ))
@@ -337,11 +343,11 @@ export default function PurchaseOrdersPage() {
                          <div>
                             <p className="font-bold">{item.productName || 'Unknown Product'}</p>
                             <p className="text-[10px] text-muted-foreground font-bold tracking-tight">
-                              QTY: <span className="text-primary">{item.quantity}</span> · COST: {currencySymbol}{item.unitCost.toFixed(2)}
+                               QTY: <span className="text-primary">{item.quantity}</span> · COST: {currencySymbol}{(item.unitCost || 0).toFixed(2)}
                             </p>
                          </div>
                          <div className="font-bold text-foreground self-center">
-                           {currencySymbol}{item.subtotal.toFixed(2)}
+                           {currencySymbol}{(item.subtotal || 0).toFixed(2)}
                          </div>
                        </div>
                      ))}
@@ -350,7 +356,7 @@ export default function PurchaseOrdersPage() {
 
                  <div className="pt-4 border-t border-border flex justify-between items-center">
                    <span className="text-sm font-bold text-muted-foreground">Order Total</span>
-                   <span className="text-2xl font-bold text-primary">{currencySymbol}{selectedPO.totalAmount.toFixed(2)}</span>
+                   <span className="text-2xl font-bold text-primary">{currencySymbol}{(selectedPO.totalAmount || 0).toFixed(2)}</span>
                  </div>
 
                  {selectedPO.status === 'PENDING' && (
@@ -439,10 +445,10 @@ export default function PurchaseOrdersPage() {
                     </div>
                     <div className="col-span-4 md:col-span-2 space-y-1.5">
                        <label className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground px-1">Quantity</label>
-                       <Input 
+                       <input 
                         type="number" 
                         min="1" 
-                        className="h-10 rounded-lg text-xs" 
+                        className="h-10 w-full rounded-lg border border-border bg-card px-3 text-xs font-bold" 
                         value={item.quantity || ''} 
                         onChange={(e) => updateItem(index, 'quantity', e.target.value)} 
                         required 
@@ -450,11 +456,11 @@ export default function PurchaseOrdersPage() {
                     </div>
                     <div className="col-span-4 md:col-span-3 space-y-1.5">
                        <label className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground px-1">Unit Cost</label>
-                       <Input 
+                       <input 
                         type="number" 
                         step="0.01" 
                         min="0" 
-                        className="h-10 rounded-lg text-xs" 
+                        className="h-10 w-full rounded-lg border border-border bg-card px-3 text-xs font-bold" 
                         value={item.unitCost || ''} 
                         onChange={(e) => updateItem(index, 'unitCost', e.target.value)} 
                         required 

@@ -68,6 +68,7 @@ export default function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
               disabled={isLoading}
+              autoFocus
             />
           </div>
           <div className="space-y-2">
@@ -100,11 +101,11 @@ export default function LoginPage() {
        </CardContent>
         <CardFooter className="flex flex-col space-y-4 text-sm text-muted-foreground">
           <div className="w-full pt-4 border-t border-border">
-             <p className="text-center w-full mb-2 text-xs">Test Accounts (Password: &apos;password&apos;)</p>
+             <p className="text-center w-full mb-2 text-xs">Test Accounts (Password: &apos;password123&apos;)</p>
               <div className="grid grid-cols-3 gap-2 text-xs text-center">
                 <div className="bg-muted/50 p-2 rounded">admin</div>
                 <div className="bg-muted/50 p-2 rounded">manager</div>
-                <div className="bg-muted/50 p-2 rounded">cashier</div>
+                <div className="bg-muted/50 p-2 rounded">cashier1</div>
               </div>
           </div>
        </CardFooter>

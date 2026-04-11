@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { ShoppingBag, Package, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, AlertTriangle, Truck, Settings, Wallet, Users } from 'lucide-react';
+import { ShoppingBag, Package, BarChart3, LogOut, X, Archive, ShoppingCart, PieChart, AlertTriangle, Truck, Settings, Wallet, Users, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
@@ -20,8 +20,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const allNavigation = [
       { name: 'Dashboard', href: '/admin', icon: BarChart3, roles: ['ADMIN', 'MANAGER'] },
-      { name: 'Sales', href: '/admin/sales', icon: ShoppingCart, roles: ['ADMIN', 'MANAGER'] },
+      { name: 'In-Store Sales', href: '/admin/sales', icon: ShoppingCart, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Online Orders', href: '/admin/online-orders', icon: ShoppingBag, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
+      { name: 'Returns', href: '/admin/returns', icon: RotateCcw, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Products', href: '/admin/products', icon: Package, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Categories', href: '/admin/categories', icon: Archive, roles: ['ADMIN', 'MANAGER'] },
       { name: 'Inventory', href: '/admin/inventory', icon: Package, roles: ['ADMIN', 'MANAGER'] },
@@ -117,7 +118,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+            <Button variant="outline" autoFocus onClick={() => setShowLogoutConfirm(false)}>
               Cancel
             </Button>
             <Button variant="danger" onClick={logout}>

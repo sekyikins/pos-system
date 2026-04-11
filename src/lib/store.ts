@@ -32,6 +32,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           productId: product.id,
           productName: product.name,
           price: product.price,
+          costPrice: product.costPrice || 0,
           quantity: Math.min(quantity, product.quantity),
           subtotal: Math.min(quantity, product.quantity) * product.price
         }]

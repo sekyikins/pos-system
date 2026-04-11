@@ -46,12 +46,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       `Date:    ${new Date(sale.timestamp).toLocaleString()}`,
       `Receipt: #${sale.id}`,
       `----------------------------`,
-      ...sale.items.map(item => `${item.productName.substring(0, 20).padEnd(20)} ${item.quantity}x ${currencySymbol}${item.price.toFixed(2)} = ${currencySymbol}${item.subtotal.toFixed(2)}`),
+      ...sale.items.map(item => `${(item.productName || 'Unknown').substring(0, 20).padEnd(20)} ${item.quantity}x ${currencySymbol}${item.price.toFixed(2)} = ${currencySymbol}${item.subtotal.toFixed(2)}`),
       `----------------------------`,
       sale.discount > 0 ? `Discount:         -${currencySymbol}${sale.discount.toFixed(2)}` : '',
       `TOTAL:             ${currencySymbol}${sale.finalAmount.toFixed(2)}`,
-      ...(sale.promoCode ? [`Promo Code:       ${sale.promoCode}`] : []),
-      `PAYMENT: ${sale.paymentMethod}`,
+      ...(sale.promoName ? [`Promotion:        ${sale.promoName}`] : []),
+      `PAYMENT: ${sale.paymentMethodId}`,
       `============================`,
       receiptFooter ? `${receiptFooter}` : `       Thank you!`,
     ].filter(Boolean);
@@ -97,7 +97,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       line();
 
       sale.items.forEach(item => {
-        row(`${item.productName.substring(0, 22)}`, `${currencySymbol}${item.subtotal.toFixed(2)}`);
+        row(`${(item.productName || 'Unknown').substring(0, 22)}`, `${currencySymbol}${item.subtotal.toFixed(2)}`);
         doc.setFontSize(7);
         doc.setTextColor(120);
         doc.text(`  ${item.quantity} x ${currencySymbol}${item.price.toFixed(2)}`, 5, y);
@@ -110,8 +110,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       doc.setFont(undefined!, 'bold');
       row('TOTAL:', `${currencySymbol}${sale.finalAmount.toFixed(2)}`, 11);
       doc.setFont(undefined!, 'normal');
-      if (sale.promoCode) row('Promo Code:', sale.promoCode, 8);
-      row('Payment:', sale.paymentMethod, 8);
+      if (sale.promoName) row('Promotion:', sale.promoName, 8);
+      row('Payment:', sale.paymentMethodId, 8);
       y += 3;
       line();
 
@@ -123,15 +123,20 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
     }
   };
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Transaction Complete">
-      {/* Success Banner */}
+  const renderHeader = () => {
+    return (
       <div className="flex flex-col items-center mb-5">
         <div className="h-14 w-14 rounded-full bg-success/10 flex items-center justify-center mb-3">
           <CheckCircle2 className="h-8 w-8 text-success" />
         </div>
         <h2 className="text-lg font-bold">Payment Successful!</h2>
       </div>
+    );
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Transaction Complete">
+      {renderHeader()}
 
       {/* Receipt Preview */}
       <div
@@ -153,7 +158,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
         <div className="border-t border-dashed border-border pt-3 mb-3 space-y-2">
           {sale.items.map(item => (
             <div key={item.id}>
-              <div className="flex justify-between font-semibold">{item.productName}<span>{currencySymbol}{item.subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between font-semibold">{(item.productName || 'Unknown')}<span>{currencySymbol}{item.subtotal.toFixed(2)}</span></div>
               <div className="text-muted-foreground text-[10px]">{item.quantity} × {currencySymbol}{item.price.toFixed(2)}</div>
             </div>
           ))}
@@ -166,16 +171,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
                 <span>Discount</span>
                 <span>-{currencySymbol}{sale.discount.toFixed(2)}</span>
               </div>
-              {sale.promoCode && (
+              {sale.promoName && (
                 <div className="flex justify-between text-[8px] text-success/70 font-bold uppercase tracking-tighter">
                   <span>Promo Applied:</span>
-                  <span>{sale.promoCode}</span>
+                  <span>{sale.promoName}</span>
                 </div>
               )}
             </div>
           )}
           <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>{currencySymbol}{sale.finalAmount.toFixed(2)}</span></div>
-          <div className="flex justify-between text-muted-foreground text-[10px]"><span>Method</span><span>{sale.paymentMethod}</span></div>
+          <div className="flex justify-between text-muted-foreground text-[10px]"><span>Method</span><span>{sale.paymentMethodId}</span></div>
         </div>
 
         <div className="text-center text-[10px] text-muted-foreground mt-3 whitespace-pre-line">{receiptFooter || 'Thank you for shopping with us!'}</div>

@@ -94,7 +94,7 @@ export default function InventoryPage() {
     setIsSaving(true);
     try {
       const supplierId = (adjustReason === 'RESTOCK' || adjustReason === 'PURCHASE_ORDER') ? (selectedSupplierId || undefined) : undefined;
-      const staffId = adjustReason === 'ADJUSTMENT' ? user?.id : undefined;
+      const staffId = user?.id;
 
       await adjustInventory(adjustingProduct.id, amount, adjustReason, supplierId, staffId);
       addToast(`Stock adjusted by ${amount > 0 ? '+' : ''}${amount}`, 'success');

@@ -19,8 +19,8 @@ interface PaymentModalProps {
   discount: number;
   finalTotal: number;
   customerId?: string;
-  customerType?: 'POS' | 'ECOMMERCE';
-  promoCode?: string;
+  customerType?: 'IN_STORE' | 'ONLINE' | 'BOTH';
+  promotionId?: string;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -30,7 +30,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   discount,
   finalTotal,
   customerId,
-  promoCode,
+  promotionId,
 }) => {
   const cart = useCartStore();
   const { addToast } = useToastStore();
@@ -57,7 +57,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       }
       setIsProcessing(true);
       paystackInitializeRef.current({
-        onSuccess: (response: { reference: string }) => {
+         onSuccess: (response: { reference: string }) => {
           completeSale('PAYSTACK', response.reference);
         },
         onClose: () => {
@@ -71,7 +71,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     completeSale('CASH');
   };
 
-  const completeSale = async (paymentMethod: 'CASH' | 'PAYSTACK', reference?: string) => {
+  const completeSale = async (paymentMethodId: 'CASH' | 'PAYSTACK', reference?: string) => {
     setIsProcessing(true);
     try {
       const sale = await processSale({
@@ -81,16 +81,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         totalAmount: cart.getTotal(),
         discount,
         finalAmount: finalTotal,
-        paymentMethod,
+        paymentMethodId,
         paymentReference: reference,
-        promoCode,
+        promotionId,
       });
 
       addToast('Payment successful! 🎉', 'success');
       cart.clearCart();
       onComplete(sale.id);
-    } catch {
-      addToast('Payment failed. Please try again.', 'error');
+    } catch (err: unknown) {
+      console.error('Sale Processing Error Full Details:', JSON.stringify(err, null, 2));
+      const error = err as Record<string, unknown>;
+      const errorMessage = (error?.message as string) || (error?.details as string) || 'Payment failed. Please try again.';
+      addToast(errorMessage, 'error');
     } finally {
       setIsProcessing(false);
     }

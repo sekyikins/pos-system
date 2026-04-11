@@ -9,8 +9,9 @@ import { Navbar } from '@/components/layout/Navbar';
 import { CartSidebar } from '@/components/cart/CartSidebar';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { ShoppingCart, ShoppingBag, Search } from 'lucide-react';
-import { OnlineOrdersList } from '@/components/pos';
+import { ShoppingCart, ShoppingBag, Search, RotateCcw } from 'lucide-react';
+import { OnlineOrdersList, InitiateReturnModal } from '@/components/pos';
+import { Button } from '@/components/ui/Button';
 
 export default function POSPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -20,6 +21,7 @@ export default function POSPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [lastBarcodeHit, setLastBarcodeHit] = useState<string | null>(null);
   const [view, setView] = useState<'POS' | 'ONLINE'>('POS');
 
@@ -78,21 +80,32 @@ export default function POSPage() {
         />
 
         <div className="px-4 lg:px-6 py-3 shrink-0 bg-card border-b border-border shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex bg-muted/30 p-1 rounded-2xl w-full sm:w-auto">
+          <div className='flex gap-2 w-full sm:w-auto'>
+            <div className="flex bg-muted/30 p-1 rounded-2xl">
              <button
                onClick={() => setView('POS')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
              >
                <ShoppingCart className="h-4 w-4" />
                Checkout
              </button>
              <button
                onClick={() => setView('ONLINE')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
              >
                <ShoppingBag className="h-4 w-4" />
-               Online Orders
+               Online <span className='hidden sm:block'>Requests</span>
              </button>
+            </div>
+
+            <Button 
+              variant="outline" 
+              className="sm:mx-2 border-primary/20 text-primary hover:bg-primary/5 relative"
+              onClick={() => setIsReturnModalOpen(true)}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Initiate Return
+            </Button>
           </div>
 
           {view === 'POS' && (
@@ -129,6 +142,11 @@ export default function POSPage() {
         variant="pos"
         isOpen={isMobileCartOpen}
         onClose={() => setIsMobileCartOpen(false)}
+      />
+
+      <InitiateReturnModal 
+        isOpen={isReturnModalOpen}
+        onClose={() => setIsReturnModalOpen(false)}
       />
     </div>
   );

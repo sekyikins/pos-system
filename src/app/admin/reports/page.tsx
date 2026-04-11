@@ -3,9 +3,9 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Sale, Product, Promotion } from '@/lib/types';
+import { Sale, Product } from '@/lib/types';
 import { getSales, getProducts } from '@/lib/db';
-import { getStorefrontSales, getPromotions } from '@/lib/db_extended';
+import { getStorefrontSales } from '@/lib/db_extended';
 import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -17,7 +17,7 @@ interface ProductStat { name: string; category: string; unitsSold: number; reven
 interface DailyStat { date: string; sales: number; revenue: number; }
 
 export default function ReportsPage() {
-  const { currencySymbol } = useSettingsStore();
+  const { currencySymbol, taxRate } = useSettingsStore();
   const [reportSource, setReportSource] = React.useState<'IN-STORE' | 'STOREFRONT'>('IN-STORE');
   const [statusFilter, setStatusFilter] = React.useState<string>('ALL');
   const [paymentFilter, setPaymentFilter] = React.useState<string>('ALL');
@@ -44,12 +44,7 @@ export default function ReportsPage() {
     refetchOnChange: true
   });
 
-  const { data: promotions, isLoading: loadingPromos, connectionStatus: promosStatus } = useRealtimeTable<Promotion>({
-    table: 'promotions',
-    initialData: [],
-    fetcher: getPromotions,
-    refetchOnChange: true
-  });
+
 
   const sales = useMemo(() => {
     let data = reportSource === 'IN-STORE' ? posSales : onlineSales.filter(s => {
@@ -59,27 +54,39 @@ export default function ReportsPage() {
     });
 
     if (paymentFilter !== 'ALL') {
-      data = data.filter(s => s.paymentMethod === paymentFilter);
+      data = data.filter(s => s.paymentMethodId === paymentFilter);
     }
-    return data;
+    return data.filter(s => !s.is_returned);
   }, [reportSource, posSales, onlineSales, statusFilter, paymentFilter]);
 
-  const isLoading = loadingSales || loadingProducts || loadingOnline || loadingPromos;
+  const isLoading = loadingSales || loadingProducts || loadingOnline;
   const connectionStatus: ConnectionStatus =
-    salesStatus === 'connected' && productsStatus === 'connected' && onlineStatus === 'connected' && promosStatus === 'connected' ? 'connected' :
-    salesStatus === 'error' || productsStatus === 'error' || onlineStatus === 'error' || promosStatus === 'error' ? 'error' : 'connecting';
+    salesStatus === 'connected' && productsStatus === 'connected' && onlineStatus === 'connected' ? 'connected' :
+    salesStatus === 'error' || productsStatus === 'error' || onlineStatus === 'error' ? 'error' : 'connecting';
 
   // ─── Compute stats (memoized) ────────────────────────────────────
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.finalAmount, 0), [sales]);
   const totalDiscount = useMemo(() => sales.reduce((s, sale) => s + sale.discount, 0), [sales]);
+  const totalProfit = useMemo(() => {
+    return sales.reduce((sum, sale) => {
+      const saleCost = sale.items.reduce((c, item) => {
+        // Cost including tax incurred by the firm
+        const effectiveCost = item.costPrice * (1 + (taxRate / 100));
+        return c + (effectiveCost * item.quantity);
+      }, 0);
+      return sum + (sale.finalAmount - saleCost);
+    }, 0);
+  }, [sales, taxRate]);
+  const grossMargin = useMemo(() => totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0, [totalRevenue, totalProfit]);
   const avgOrderValue = useMemo(() => sales.length > 0 ? totalRevenue / sales.length : 0, [sales, totalRevenue]);
 
   const paymentBreakdown = useMemo(() => {
     const breakdown: Record<string, { count: number; total: number }> = {};
     sales.forEach(sale => {
-      if (!breakdown[sale.paymentMethod]) breakdown[sale.paymentMethod] = { count: 0, total: 0 };
-      breakdown[sale.paymentMethod].count++;
-      breakdown[sale.paymentMethod].total += sale.finalAmount;
+      const pm = sale.paymentMethodId || 'UNKNOWN';
+      if (!breakdown[pm]) breakdown[pm] = { count: 0, total: 0 };
+      breakdown[pm].count++;
+      breakdown[pm].total += sale.finalAmount;
     });
     return Object.values(breakdown).length > 0 ? breakdown : {};
   }, [sales]);
@@ -90,7 +97,7 @@ export default function ReportsPage() {
       sale.items.forEach(item => {
         if (!map[item.productId]) {
           const p = products.find(prod => prod.id === item.productId);
-          map[item.productId] = { name: item.productName, category: p?.category ?? '—', unitsSold: 0, revenue: 0 };
+          map[item.productId] = { name: item.productName || 'Unknown Product', category: p?.category ?? '—', unitsSold: 0, revenue: 0 };
         }
         map[item.productId].unitsSold += item.quantity;
         map[item.productId].revenue += item.subtotal;
@@ -149,27 +156,16 @@ export default function ReportsPage() {
   const promoStats = useMemo(() => {
     const stats: Record<string, { count: number; totalDiscount: number }> = {};
     
-    // Create a code-to-name lookup for in-store sales
-    const promoLookup: Record<string, string> = {};
-    promotions.forEach(p => {
-      promoLookup[p.code] = p.name;
-    });
-
     sales.forEach(sale => {
-      if (sale.promoCode && sale.promoCode !== 'null' && sale.promoCode.trim() !== '') {
-        // For In-Store, promoCode is the CODE. For Storefront, it's already the NAME (mapped in db_extended)
-        // If it looks like a name (exists in names list) or we can't find the code, keep it.
-        const displayName = reportSource === 'IN-STORE' 
-          ? (promoLookup[sale.promoCode] || sale.promoCode)
-          : sale.promoCode;
-
+      if (sale.promoName) {
+        const displayName = sale.promoName;
         if (!stats[displayName]) stats[displayName] = { count: 0, totalDiscount: 0 };
         stats[displayName].count++;
         stats[displayName].totalDiscount += sale.discount;
       }
     });
     return Object.entries(stats).sort((a, b) => b[1].totalDiscount - a[1].totalDiscount);
-  }, [sales, promotions, reportSource]);
+  }, [sales]);
 
   const { categoryStats, maxCat } = useMemo(() => {
     const categoryMap: Record<string, number> = {};
@@ -183,6 +179,20 @@ export default function ReportsPage() {
     const stats = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
     return { categoryStats: stats, maxCat: Math.max(...stats.map(c => c[1]), 1) };
   }, [sales, products]);
+
+  const chartRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (chartRef.current && dailyStats.length > 0) {
+      // Small timeout to ensure browser has rendered the content after loading state
+      const timeout = setTimeout(() => {
+        if (chartRef.current) {
+          chartRef.current.scrollLeft = chartRef.current.scrollWidth;
+        }
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [dailyStats, isLoading]);
 
 
   return (
@@ -223,12 +233,17 @@ export default function ReportsPage() {
             >
               <option value="ALL">All Methods</option>
               <option value="PAYSTACK">Paystack</option>
-              <option value="CASH">Cash on Delivery</option>
+              {reportSource === 'IN-STORE' ? (
+                <option value="CASH">Cash</option>
+              ) : (
+                <option value="PAY_ON_DELIVERY">Pay On Delivery</option>
+              )}
             </select>
             <select
               value={reportSource}
               onChange={(e) => {
                  setReportSource(e.target.value as 'IN-STORE' | 'STOREFRONT');
+                 setPaymentFilter('ALL');
               }}
               className="h-11 px-4 text-sm font-bold rounded-xl border border-border bg-muted/20 text-foreground hover:bg-muted/30 transition-all appearance-none cursor-pointer shadow-sm focus:outline-none focus:border-primary"
             >
@@ -239,9 +254,9 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {isLoading ? (
-          [...Array(4)].map((_, i) => (
+          [...Array(5)].map((_, i) => (
             <Card key={i}>
               <CardContent className="pt-5 flex flex-col items-center sm:items-start space-y-2">
                 <Skeleton className="h-10 w-10 rounded-lg" />
@@ -252,9 +267,10 @@ export default function ReportsPage() {
           ))
         ) : (
           [
-            { label: reportSource === 'STOREFRONT' ? `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).toLowerCase()} Revenue` : 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
-            { label: 'Total Transactions', value: sales.length, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
-            { label: 'Avg/Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
+            { label: 'Net Profit', value: `${currencySymbol}${totalProfit.toFixed(2)}`, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
+            { label: 'Gross Margin', value: `${grossMargin.toFixed(1)}%`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
+            { label: 'Avg Order Value', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
             { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
           ].map(item => (
             <Card key={item.label}>
@@ -278,7 +294,10 @@ export default function ReportsPage() {
               Daily Revenue
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-10 overflow-x-auto no-scrollbar">
+          <CardContent 
+            ref={chartRef}
+            className="pb-10 overflow-x-auto no-scrollbar scroll-smooth"
+          >
             {isLoading ? (
               <div className="flex items-end gap-1.5 h-[300px]">
                 {[55, 30, 45, 60, 25, 80, 50, 65, 35, 75, 40, 20, 90, 55].map((h, i) => (
@@ -286,13 +305,13 @@ export default function ReportsPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex items-end gap-1.5 h-[300px] min-w-max pb-8">
+              <div className="flex items-end gap-1.5 h-[400px] min-w-max pb-8">
                 {dailyStats.map(d => (
-                  <div key={d.date} className="w-12 flex flex-col items-center gap-1 group">
+                  <div key={d.date} className="w-15 flex flex-col items-center gap-1 group">
                     <div className="relative w-full flex justify-center px-1">
                       <div title={`${d.date}: ${currencySymbol}${d.revenue.toFixed(2)}`}
-                        style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 240)}px` }}
-                        className={`w-full rounded-t-lg transition-all duration-300 ${d.isCurrentWeek ? 'bg-primary shadow-[0_0_15px_-3px_rgba(var(--primary),0.4)]' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'}`}
+                        style={{ height: `${Math.max(4, (d.revenue / maxRevenue) * 340)}px` }}
+                        className={`w-full rounded-t-sm transition-all duration-300 ${d.isCurrentWeek ? 'bg-primary hover:bg-primary/80 shadow-[0_0_15px_-3px_rgba(var(--primary),0.4)]' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'}`}
                       />
                     </div>
                     <span className={`text-[10px] font-bold rotate-45 origin-left mt-2 whitespace-nowrap transition-colors ${d.isCurrentWeek ? 'text-primary' : 'text-muted-foreground/60'}`}>
@@ -383,7 +402,7 @@ export default function ReportsPage() {
                   {Object.entries(paymentBreakdown).map(([method, stat]) => (
                     <div key={method} className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">{method.replace('_', ' ')}</p>
+                        <p className="text-sm font-medium">{method.replace(/_/g, ' ')}</p>
                         <p className="text-xs text-muted-foreground">{stat.count} transactions</p>
                       </div>
                       <Badge variant="secondary">{currencySymbol}{stat.total.toFixed(2)}</Badge>

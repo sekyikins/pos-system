@@ -35,10 +35,10 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [csQuery, setCsQuery] = useState('');
   const [isQuickAdd, setIsQuickAdd] = useState(false);
-  const [quickAddForm, setQuickAddForm] = useState({ name: '', phone: '' });
+  const [quickAddForm, setQuickAddForm] = useState({ name: '', phone: '', email: '' });
 
   const { data: allCustomers, refetch: refetchCustomers } = useRealtimeTable<Customer>({
-    table: 'customer',
+    table: 'customers',
     initialData: [],
     fetcher: getPosCustomers,
     refetchOnChange: true
@@ -62,20 +62,25 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
   const selectedCustomer = allCustomers.find((c: Customer) => c.id === selectedCustomerId);
   const filteredCustomers = allCustomers.filter((c: Customer) => 
     c.name.toLowerCase().includes(csQuery.toLowerCase()) || 
-    c.phone?.includes(csQuery)
+    c.phone?.includes(csQuery) ||
+    c.email?.toLowerCase().includes(csQuery.toLowerCase())
   );
 
   const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickAddForm.name) return;
     try {
-      const newC = await addPosCustomer({ name: quickAddForm.name, phone: quickAddForm.phone || undefined });
+      const newC = await addPosCustomer({ 
+        name: quickAddForm.name, 
+        phone: quickAddForm.phone || undefined,
+        email: quickAddForm.email || undefined
+      });
       await refetchCustomers();
       setSelectedCustomerId(newC.id);
       setIsQuickAdd(false);
       setIsCustomerSearchOpen(false);
-      setQuickAddForm({ name: '', phone: '' });
-      addToast('Customer added & selected', 'success');
+      setQuickAddForm({ name: '', phone: '', email: '' });
+      addToast(newC.type === 'BOTH' ? 'Online account linked!' : 'Customer added & selected', 'success');
     } catch { addToast('Failed to add customer', 'error'); }
   };
   
@@ -226,11 +231,18 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
                          onChange={e => setQuickAddForm({...quickAddForm, name: e.target.value})}
                          autoFocus
                        />
-                       <input 
+                        <input 
                          placeholder="Phone (optional)" 
                          className="w-full h-9 px-3 rounded-lg border border-border bg-muted outline-none text-sm"
                          value={quickAddForm.phone}
                          onChange={e => setQuickAddForm({...quickAddForm, phone: e.target.value})}
+                       />
+                       <input 
+                         type="email"
+                         placeholder="Email (for Online Account linking)" 
+                         className="w-full h-9 px-3 rounded-lg border border-border bg-muted outline-none text-sm"
+                         value={quickAddForm.email}
+                         onChange={e => setQuickAddForm({...quickAddForm, email: e.target.value})}
                        />
                        <div className="flex gap-2">
                          <Button type="submit" size="sm" fullWidth>Save & Select</Button>
@@ -490,7 +502,7 @@ export function CartSidebar({ variant, isOpen, onClose }: CartSidebarProps) {
           finalTotal={finalTotal}
           customerId={selectedCustomerId || undefined}
           customerType={selectedCustomer?.type}
-          promoCode={promotions.find(p => p.id === selectedPromoId)?.code}
+          promotionId={selectedPromoId || undefined}
           onComplete={(saleId) => {
             setIsPaymentOpen(false);
             setLastSaleId(saleId);

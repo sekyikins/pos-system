@@ -51,7 +51,7 @@ export default function OnlineOrdersPage() {
     orders.filter(o => {
       const matchSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           o.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          o.paymentMethod.toLowerCase().includes(searchQuery.toLowerCase());
+                          o.paymentMethodId.toLowerCase().includes(searchQuery.toLowerCase());
       const matchStatus = filterStatus === 'ALL' || o.status === filterStatus;
       return matchSearch && matchStatus;
     }), [orders, searchQuery, filterStatus]);
@@ -272,9 +272,9 @@ export default function OnlineOrdersPage() {
         {selectedOrder && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div><p className="text-xs text-muted-foreground">Order ID</p><p className="font-mono text-sm">{selectedOrder.id}</p></div>
+              <div><p className="text-xs text-muted-foreground">Order ID</p><p className="font-mono text-sm">{(selectedOrder.id.trim()).slice(-8).toUpperCase()}</p></div>
               <div><p className="text-xs text-muted-foreground">Date</p><p className="text-sm">{new Date(selectedOrder.createdAt).toLocaleString()}</p></div>
-              <div><p className="text-xs text-muted-foreground">Payment Method</p><p className="text-sm font-medium">{selectedOrder.paymentMethod.replace(/_/g, ' ')}</p></div>
+              <div><p className="text-xs text-muted-foreground">Payment Method</p><p className="text-sm font-medium">{selectedOrder.paymentMethodId.replace(/_/g, ' ')}</p></div>
               <div><p className="text-xs text-muted-foreground">Total Amount</p><p className="text-sm font-bold text-success">{currencySymbol}{selectedOrder.totalAmount.toFixed(2)}</p></div>
             </div>
             <div className="bg-muted/30 p-4 rounded-xl border border-border">
@@ -293,14 +293,30 @@ export default function OnlineOrdersPage() {
               )}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Update Order Status</label>
-              <select value={selectedOrder.status} onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)} disabled={isUpdating} className="w-full h-10 px-3 text-sm rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30">
-                <option value="PENDING">Pending</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="SHIPPED">Shipped / Ready for Pickup</option>
-                <option value="DELIVERED">Delivered / Picked Up</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
+              {(selectedOrder.status === 'DELIVERED' || selectedOrder.status === 'CANCELLED') ? (
+                <div className={`flex items-center gap-3 p-3 rounded-xl border-2 ${
+                  selectedOrder.status === 'DELIVERED'
+                    ? 'bg-success/10 border-success/20 text-success'
+                    : 'bg-destructive/10 border-destructive/20 text-destructive'
+                }`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest">Order Finalised</p>
+                    <p className="text-[11px] opacity-70 mt-0.5">This order is <span className="font-bold">{selectedOrder.status}</span> and cannot be updated further.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <label className="text-sm font-medium">Update Order Status</label>
+                  <select value={selectedOrder.status} onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)} disabled={isUpdating} className="w-full h-10 px-3 text-sm rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="PENDING">Pending</option>
+                    <option value="CONFIRMED">Confirmed</option>
+                    <option value="SHIPPED">Shipped / Ready for Pickup</option>
+                    <option value="DELIVERED">Delivered / Picked Up</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </>
+              )}
             </div>
             <div className="flex justify-end pt-4 border-t border-border mt-6">
               <Button variant="outline" onClick={() => setIsViewOpen(false)}>Confirm</Button>

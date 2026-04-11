@@ -7,16 +7,14 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Customer } from '@/lib/types';
-import { getAllCustomers, addPosCustomer, updatePosCustomer, deletePosCustomer } from '@/lib/db';
+import { getAllCustomers, addPosCustomer, updateCustomer, deleteCustomer } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store, Layers } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
 
 type SortKey = 'name' | 'date' | 'loyalty';
-
-// Unified LiveStatus replaces local ConnBadge
 
 export default function CustomersPage() {
   const [isSaving, setIsSaving] = useState(false);
@@ -31,7 +29,7 @@ export default function CustomersPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '' });
 
   const { data: customers, isLoading, connectionStatus, refetch } = useRealtimeTable<Customer>({
-    table: 'customer',
+    table: 'customers',
     initialData: [],
     fetcher: getAllCustomers,
     refetchOnChange: true,
@@ -42,7 +40,12 @@ export default function CustomersPage() {
       const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.phone?.includes(searchQuery) ||
                           c.email?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchType = filterType === 'ALL' || c.type === (filterType === 'STOREFRONT' ? 'ECOMMERCE' : 'POS');
+      
+      let matchType = true;
+      if (filterType === 'STOREFRONT') matchType = c.type === 'ONLINE';
+      else if (filterType === 'INSTORE') matchType = c.type === 'IN_STORE';
+      else if (filterType === 'BOTH') matchType = c.type === 'BOTH';
+      
       return matchSearch && matchType;
     });
 
@@ -67,15 +70,13 @@ export default function CustomersPage() {
     });
   }, [customers, searchQuery, sortKey, sortOrder, filterType]);
 
-
-
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name) return;
     setIsSaving(true);
     try {
-      await addPosCustomer({ name: form.name, phone: form.phone || undefined, email: form.email || undefined });
-      addToast('Customer added', 'success');
+      const result = await addPosCustomer({ name: form.name, phone: form.phone || undefined, email: form.email || undefined });
+      addToast(result.type === 'BOTH' ? 'Online account linked & upgraded to BOTH!' : 'Customer added', 'success');
       refetch();
       setIsAddOpen(false);
       setForm({ name: '', phone: '', email: '' });
@@ -84,7 +85,10 @@ export default function CustomersPage() {
   };
 
   const handleEditOpen = (c: Customer) => {
-    if (c.type === 'ECOMMERCE') { addToast('Storefront customer data is read-only in POS Admin', 'info'); return; }
+    if (c.type === 'ONLINE' || c.type === 'BOTH') { 
+      addToast('Online accounts are read-only in POS Admin to protect identity data', 'info'); 
+      return; 
+    }
     setEditingCustomer(c);
     setForm({ name: c.name, phone: c.phone || '', email: c.email || '' });
     setIsEditOpen(true);
@@ -95,7 +99,7 @@ export default function CustomersPage() {
     if (!editingCustomer) return;
     setIsSaving(true);
     try {
-      await updatePosCustomer(editingCustomer.id, { name: form.name, phone: form.phone || undefined, email: form.email || undefined });
+      await updateCustomer(editingCustomer.id, { name: form.name, phone: form.phone || undefined, email: form.email || undefined });
       addToast('Customer updated', 'success');
       refetch();
       setIsEditOpen(false);
@@ -104,10 +108,13 @@ export default function CustomersPage() {
   };
 
   const handleDelete = async (c: Customer) => {
-    if (c.type === 'ECOMMERCE') { addToast('Cannot delete storefront customers from here.', 'error'); return; }
+    if (c.type === 'ONLINE' || c.type === 'BOTH') { 
+      addToast('Cannot delete accounts with associated online profiles from here.', 'error'); 
+      return; 
+    }
     if (!window.confirm('Delete this customer?')) return;
     try {
-      await deletePosCustomer(c.id);
+      await deleteCustomer(c.id);
       addToast('Customer deleted', 'info');
       refetch();
     } catch { addToast('Failed to delete', 'error'); }
@@ -121,7 +128,7 @@ export default function CustomersPage() {
             <User className="h-8 w-8 text-primary" />
             Unified Customers
           </h1>
-          <p className="text-sm text-muted-foreground font-medium">Overview of both in-store and e-commerce shoppers</p>
+          <p className="text-sm text-muted-foreground font-medium">Overview of in-store, storefront, and omnichannel shoppers</p>
         </div>
         <div className="flex items-center gap-3">
           <LiveStatus status={connectionStatus} />
@@ -131,9 +138,9 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {isLoading ? (
-          [...Array(3)].map((_, i) => (
+          [...Array(4)].map((_, i) => (
             <Card key={i} className="bg-muted/5 border-border/50">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
@@ -155,7 +162,7 @@ export default function CustomersPage() {
                       <User className="h-6 w-6" />
                    </div>
                    <div>
-                      <p className="text-sm font-bold text-muted-foreground">Total Customers</p>
+                      <p className="text-sm font-bold text-muted-foreground">Total</p>
                       <p className="text-2xl font-bold">{customers.length}</p>
                    </div>
                 </div>
@@ -168,21 +175,34 @@ export default function CustomersPage() {
                       <Monitor className="h-6 w-6" />
                    </div>
                    <div>
-                      <p className="text-sm font-bold text-muted-foreground">Storefront Users</p>
-                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'ECOMMERCE').length}</p>
+                      <p className="text-sm font-bold text-muted-foreground">Storefront</p>
+                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'ONLINE').length}</p>
                    </div>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-success/5 border-success/20 col-span-2 md:col-span-1">
+            <Card className="bg-success/5 border-success/20">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-success/20 flex items-center justify-center text-success">
                       <Store className="h-6 w-6" />
                    </div>
                    <div>
-                      <p className="text-sm font-bold text-muted-foreground">In-Store Customers</p>
-                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'POS').length}</p>
+                      <p className="text-sm font-bold text-muted-foreground">In-Store</p>
+                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'IN_STORE').length}</p>
+                   </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-warning/5 border-warning/20">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                   <div className="h-12 w-12 rounded-2xl bg-warning/20 flex items-center justify-center text-warning">
+                      <Layers className="h-6 w-6" />
+                   </div>
+                   <div>
+                      <p className="text-sm font-bold text-muted-foreground">Both</p>
+                      <p className="text-2xl font-bold">{customers.filter(c => c.type === 'BOTH').length}</p>
                    </div>
                 </div>
               </CardContent>
@@ -213,6 +233,7 @@ export default function CustomersPage() {
                 <option value="ALL">All Sources</option>
                 <option value="STOREFRONT">Storefront</option>
                 <option value="INSTORE">In-Store</option>
+                <option value="BOTH">Both</option>
               </select>
               <div className="relative w-full sm:w-auto">
                 <ArrowUpDown className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
@@ -277,7 +298,9 @@ export default function CustomersPage() {
                       <td className="p-5">
                         <div className="flex items-center gap-4">
                           <div className={`h-10 w-10 rounded-2xl flex items-center justify-center font-bold shadow-sm ${
-                            c.type === 'ECOMMERCE' ? 'bg-info/20 text-info' : 'bg-success/20 text-success'
+                            c.type === 'ONLINE' ? 'bg-info/20 text-info' : 
+                            c.type === 'BOTH' ? 'bg-warning/20 text-warning' :
+                            'bg-success/20 text-success'
                           }`}>
                             {c.name.charAt(0)}
                           </div>
@@ -303,10 +326,16 @@ export default function CustomersPage() {
                       </td>
                       <td className="p-5">
                         <Badge variant="outline" className={`rounded-lg py-1 flex items-center gap-1.5 w-fit font-bold ${
-                          c.type === 'ECOMMERCE' ? 'border-info/30 bg-info/5 text-info' : 'border-success/30 bg-success/5 text-success'
+                          c.type === 'ONLINE' ? 'border-info/30 bg-info/5 text-info' : 
+                          c.type === 'BOTH' ? 'border-warning/30 bg-warning/5 text-warning' :
+                          'border-success/30 bg-success/5 text-success'
                         }`}>
-                          {c.type === 'ECOMMERCE' ? <Monitor className="h-3 w-3" /> : <Store className="h-3 w-3" />}
-                          {c.type === 'ECOMMERCE' ? 'Storefront' : 'In-Store'}
+                          {c.type === 'ONLINE' ? <Monitor className="h-3 w-3" /> : 
+                           c.type === 'BOTH' ? <Layers className="h-3 w-3" /> :
+                           <Store className="h-3 w-3" />}
+                          {c.type === 'ONLINE' ? 'Storefront' : 
+                           c.type === 'BOTH' ? 'Both' :
+                           'In-Store'}
                         </Badge>
                       </td>
                       <td className="p-5">
@@ -324,18 +353,18 @@ export default function CustomersPage() {
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-info/20 text-info" 
+                            className={`h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-info/20 text-info ${(c.type === 'ONLINE' || c.type === 'BOTH') ? 'opacity-20 cursor-not-allowed' : ''}`} 
                             onClick={() => handleEditOpen(c)}
-                            disabled={c.type === 'ECOMMERCE'}
+                            disabled={c.type === 'ONLINE' || c.type === 'BOTH'}
                           >
                             <Edit className="h-4.5 w-4.5" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-destructive/10 text-destructive" 
+                            className={`h-10 w-10 p-0 rounded-xl bg-muted/30 hover:bg-destructive/10 text-destructive ${(c.type === 'ONLINE' || c.type === 'BOTH') ? 'opacity-20 cursor-not-allowed' : ''}`} 
                             onClick={() => handleDelete(c)}
-                            disabled={c.type === 'ECOMMERCE'}
+                            disabled={c.type === 'ONLINE' || c.type === 'BOTH'}
                           >
                             <Trash2 className="h-4.5 w-4.5" />
                           </Button>

@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { getSales, getProducts, getUsers, getOnlineOrders } from '@/lib/db';
-import { Sale, Product, StaffRecord, OnlineOrder } from '@/lib/types';
-import { CircleDollarSign, Package, TrendingUp, AlertTriangle, Users, Monitor, Store, Clock } from 'lucide-react';
+import { getSales, getProducts, getUsers } from '@/lib/db';
+import { getStorefrontSales } from '@/lib/db_extended';
+import { Sale, Product, StaffRecord, TransactionItem } from '@/lib/types';
+import { DollarSign, Package, BarChart2, TrendingUp, AlertTriangle, Users, Monitor, Store, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
@@ -15,7 +16,7 @@ import { useSettingsStore } from '@/lib/store';
 
 export default function AdminDashboard() {
   const [cashierFilter, setCashierFilter] = useState<'ALL' | 'ONLINE' | 'INSTORE'>('INSTORE');
-  const { currencySymbol } = useSettingsStore();
+  const { currencySymbol, taxRate } = useSettingsStore();
 
   const { data: products, isLoading: loadingProducts, connectionStatus: prodStatus } = useRealtimeTable<Product>({
     table: 'products',
@@ -35,49 +36,73 @@ export default function AdminDashboard() {
     fetcher: getUsers as unknown as () => Promise<StaffRecord[]>,
   });
 
-  const { data: onlineOrders, isLoading: loadingOnline } = useRealtimeTable<OnlineOrder>({
+  const { data: onlineOrders, isLoading: loadingOnline } = useRealtimeTable<Sale>({
     table: 'online_orders',
     initialData: [],
-    fetcher: getOnlineOrders,
+    fetcher: getStorefrontSales,
   });
 
   const isLoading = loadingProducts || loadingSales || loadingStaff || loadingOnline;
   const connectionStatus: ConnectionStatus = prodStatus === 'connected' && salesStatus === 'connected' ? 'connected' : prodStatus === 'error' || salesStatus === 'error' ? 'error' : 'connecting';
 
   const stats = useMemo(() => {
-    const activeOnlineOrders = onlineOrders.filter(o => o.status !== 'CANCELLED');
-    const posRevenue = sales.reduce((acc, s) => acc + s.finalAmount, 0);
+    const activeOnlineOrders = onlineOrders.filter(o => o.status !== 'CANCELLED' && !o.is_returned);
+    const activeSales = sales.filter(s => !s.is_returned);
+    
+    const posRevenue = activeSales.reduce((acc, s) => acc + s.finalAmount, 0);
     // Only delivered online orders count towards "Total Revenue"
     const deliveredOnline = activeOnlineOrders.filter(o => o.status === 'DELIVERED');
-    const onlineRevenue = deliveredOnline.reduce((acc, o) => acc + o.totalAmount, 0);
+    const onlineRevenue = deliveredOnline.reduce((acc, o) => acc + o.finalAmount, 0);
     
     const lowStock = products.filter(p => p.quantity < 10);
+    
+    // Calculate Profit & Tax Incurred
+    const calculateStats = (records: Sale[]) => {
+      let profit = 0;
+      let tax = 0;
+      records.forEach(sale => {
+        const saleCost = sale.items.reduce((acc: number, item: TransactionItem) => {
+          const baseCost = (item.costPrice || 0) * item.quantity;
+          const itemTax = baseCost * (taxRate / 100);
+          tax += itemTax;
+          return acc + (baseCost + itemTax);
+        }, 0);
+        profit += sale.finalAmount - saleCost;
+      });
+      return { profit, tax };
+    };
+
+    const posStats = calculateStats(activeSales);
+    const onlineStats = calculateStats(deliveredOnline);
+
     return { 
       totalSales: sales.length + activeOnlineOrders.length, 
       totalRevenue: posRevenue + onlineRevenue, 
+      totalProfit: posStats.profit + onlineStats.profit,
+      totalTaxIncurred: posStats.tax + onlineStats.tax,
       totalProducts: products.length, 
       lowStock: lowStock.length 
     };
-  }, [products, sales, onlineOrders]);
+  }, [products, sales, onlineOrders, taxRate]);
 
   const recentSales = useMemo(() => {
-    const instore = sales.map(s => ({
+    const instore = sales.filter(s => !s.is_returned).map(s => ({
       id: s.id,
       timestamp: s.timestamp,
       finalAmount: s.finalAmount,
       itemsCount: s.items.length,
-      paymentMethod: s.paymentMethod,
+      paymentMethodId: s.paymentMethodId,
       type: 'IN-STORE' as const
     }));
     
     const online = onlineOrders
-      .filter(o => o.status !== 'CANCELLED')
+      .filter(o => o.status !== 'CANCELLED' && !o.is_returned)
       .map(o => ({
         id: o.id,
-        timestamp: o.createdAt,
-        finalAmount: o.totalAmount,
-        itemsCount: 0,
-        paymentMethod: o.paymentMethod,
+        timestamp: o.timestamp,
+        finalAmount: o.finalAmount,
+        itemsCount: o.items.length,
+        paymentMethodId: o.paymentMethodId,
         type: 'ONLINE' as const
       }));
 
@@ -89,7 +114,7 @@ export default function AdminDashboard() {
     
     // Process POS Sales
     if (cashierFilter === 'ALL' || cashierFilter === 'INSTORE') {
-      sales.forEach(s => {
+      sales.filter(s => !s.is_returned).forEach(s => {
         if (!stats[s.cashierId]) stats[s.cashierId] = { id: s.cashierId, name: 'Unknown', count: 0, revenue: 0 };
         stats[s.cashierId].count++;
         stats[s.cashierId].revenue += s.finalAmount;
@@ -98,11 +123,12 @@ export default function AdminDashboard() {
 
     // Process Online Orders
     if (cashierFilter === 'ALL' || cashierFilter === 'ONLINE') {
-      onlineOrders.forEach(o => {
-        if (o.processingStaffId && (o.status === 'DELIVERED' || o.status === 'SHIPPED' || o.status === 'CONFIRMED')) {
-          if (!stats[o.processingStaffId]) stats[o.processingStaffId] = { id: o.processingStaffId, name: 'Unknown', count: 0, revenue: 0 };
-          stats[o.processingStaffId].count++;
-          stats[o.processingStaffId].revenue += o.totalAmount;
+      onlineOrders.filter(o => !o.is_returned).forEach(o => {
+        // Only count if it was processed by a staff member (not just 'ONLINE')
+        if (o.cashierId && o.cashierId !== 'ONLINE' && (o.status === 'DELIVERED' || o.status === 'SHIPPED' || o.status === 'CONFIRMED')) {
+          if (!stats[o.cashierId]) stats[o.cashierId] = { id: o.cashierId, name: 'Unknown', count: 0, revenue: 0 };
+          stats[o.cashierId].count++;
+          stats[o.cashierId].revenue += o.finalAmount;
         }
       });
     }
@@ -118,8 +144,8 @@ export default function AdminDashboard() {
   if (isLoading) return (
     <div className="space-y-6">
       <div className="h-10 w-48 bg-muted animate-pulse rounded-lg mb-6" />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+        {[...Array(5)].map((_, i) => (
           <Card key={i}>
             <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
             <CardContent><Skeleton className="h-8 w-32 mb-2" /><Skeleton className="h-3 w-20" /></CardContent>
@@ -152,22 +178,37 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <CircleDollarSign className="h-4 w-4 text-success" />
+            <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{currencySymbol}{stats.totalRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">In-store + Delivered Online</p>
+            <p className="text-xs text-muted-foreground">Gross sales amount</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <TrendingUp className={`h-4 w-4 ${stats.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {currencySymbol}{stats.totalProfit.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              After {taxRate}% firm tax ({currencySymbol}{stats.totalTaxIncurred.toFixed(2)})
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-            <TrendingUp className="h-4 w-4 text-info" />
+            <BarChart2 className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -250,7 +291,7 @@ export default function AdminDashboard() {
                           +{currencySymbol}{sale.finalAmount.toFixed(2)}
                        </div>
                        <div className="bg-muted/30 px-2 py-0.5 rounded text-[9px] font-bold text-muted-foreground uppercase tracking-widest border border-border">
-                          {sale.paymentMethod.replace('_', ' ')}
+                          {sale.paymentMethodId?.replace('_', ' ')}
                        </div>
                     </div>
                   </div>
