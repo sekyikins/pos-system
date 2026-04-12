@@ -16,6 +16,14 @@ export type AuthUser = Omit<StaffRecord, 'passwordHash'>;
 /** Alias kept for mock-db.ts compatibility. */
 export type User = StaffRecord;
 
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  is_primary: boolean;
+  created_at?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -27,6 +35,7 @@ export interface Product {
   barcode: string;
   description?: string;
   image_url?: string;
+  images?: ProductImage[];
   supplierId?: string;
   supplierName?: string;
   is_returnable?: boolean;
@@ -194,33 +203,33 @@ export interface Expense {
 
 export interface ReturnItem {
   id: string;
-  return_id: string;
-  product_id: string;
-  product_name?: string; // from join
+  returnId: string;
+  productId: string;
+  productName?: string;
   quantity: number;
-  unit_price: number;
+  unitPrice: number;
   subtotal: number;
-  created_at?: string;
 }
 
 export interface Return {
   id: string;
-  sale_id: string | null;
-  order_id: string | null;
-  customer_id: string | null;
-  initiated_by_staff_id: string | null;
-  processed_by_staff_id: string | null;
+  saleId: string | null;
+  orderId: string | null;
+  customerId: string | null;
+  initiatedByStaffId: string | null;
+  processedByStaffId: string | null;
   source: 'IN_STORE' | 'ONLINE';
   reason: string;
   status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
-  refund_amount: number | null;
-  rejection_reason: string | null;
-  requested_at: string;
-  processed_at: string | null;
-  completed_at: string | null;
+  refundAmount: number | null;
+  rejectionReason: string | null;
+  requestedAt: string;
+  processedAt: string | null;
+  completedAt: string | null;
   items?: ReturnItem[];
-  // Joined fields
-  customer_name?: string;
-  initiated_by_name?: string;
-  processed_by_name?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  customerName?: string;
+  initiatedByName?: string;
+  processedByName?: string;
 }

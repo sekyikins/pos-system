@@ -72,11 +72,11 @@ export const DataExporter: React.FC = () => {
             STAFF: e.loggedByName
           })),
           ...returns.map(r => ({
-            DATE: r.requested_at,
+            DATE: r.requestedAt,
             CATEGORY: 'RETURN REFUND',
-            DESC: `Return for ${r.sale_id || r.order_id}`,
-            AMOUNT: -(r.refund_amount || 0),
-            STAFF: r.initiated_by_name
+            DESC: `Return for ${r.saleId || r.orderId}`,
+            AMOUNT: -(r.refundAmount || 0),
+            STAFF: r.initiatedByName
           }))
         ];
       }

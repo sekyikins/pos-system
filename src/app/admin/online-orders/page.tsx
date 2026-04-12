@@ -221,7 +221,7 @@ export default function OnlineOrdersPage() {
                     <th className="px-6 py-3">Order ID</th>
                     <th className="px-6 py-3">Date</th>
                     <th className="px-6 py-3">Delivery Type</th>
-                    <th className="px-6 py-3">Amount</th>
+                    <th className="px-6 py-3 text-center">Amount</th>
                     <th className="px-6 py-3">Status</th>
                     <th className="px-6 py-3 text-center">View</th>
                   </tr>
@@ -235,9 +235,9 @@ export default function OnlineOrdersPage() {
                     return (
                       <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                         <td className="p-5 font-mono text-xs gap-2">
-                          <div className='flex justify-center'>
+                          <div className='flex justify-center gap-2'>
                             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-                          {o.id.slice(-8).toUpperCase()}
+                            {o.id.slice(-8).toUpperCase()}
                           </div>
                         </td>
                         <td className="p-5 text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</td>
@@ -253,7 +253,7 @@ export default function OnlineOrdersPage() {
                         <td className="p-5">
                           <Badge variant="outline" className={statusBadge.class}>{statusBadge.label}</Badge>
                         </td>
-                        <td className="p-5 text-right">
+                        <td className="p-5 text-center">
                           <Button variant="ghost" size="sm" onClick={() => { setSelectedOrder(o); setIsViewOpen(true); }}>
                             <Eye className="h-4 w-4 mx-1" />
                           </Button>

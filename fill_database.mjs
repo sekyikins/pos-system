@@ -45,7 +45,7 @@ const genGenericRef = () => {
 
 async function cleanAll() {
   console.log('🧹 Deep cleaning database...');
-  const tables = ['return_items', 'returns', 'payments', 'transaction_items', 'online_orders', 'sales', 'inventory', 'purchase_order_items', 'purchase_orders', 'product_reviews', 'expenses', 'product_suppliers', 'product_images', 'products', 'promotions', 'delivery_points', 'payment_methods', 'pos_staff', 'customers', 'suppliers', 'categories'];
+  const tables = ['return_items', 'returns', 'payments', 'transaction_items', 'online_orders', 'sales', 'inventory', 'purchase_order_items', 'purchase_orders', 'product_reviews', 'expenses', 'product_suppliers', 'product_images', 'products', 'promotions', 'delivery_points', 'payment_methods', 'pos_staff', 'customers', 'suppliers', 'categories', 'store_settings'];
   for (const table of tables) {
     await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
   }
@@ -159,6 +159,26 @@ async function main() {
   // Link Suppliers
   const psRows = products.map(p => ({ product_id: p.id, supplier_id: pick(suppliers).id }));
   await insert('product_suppliers', psRows);
+
+  // 7.5 Product Images
+  const imageUrls = [
+    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1526170315870-ef51865e3513?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=400',
+    'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=400'
+  ];
+  const imageRows = products.map(p => ({
+    product_id: p.id,
+    image_url: pick(imageUrls),
+    is_primary: true
+  }));
+  await insert('product_images', imageRows);
 
   // 8. Customers
   const customerNames = [

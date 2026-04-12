@@ -153,7 +153,7 @@ export default function SalesPage() {
                     <th className="px-6 py-4">Method</th>
                     <th className="px-6 py-4">Adjustment</th>
                     <th className="px-6 py-4">Total</th>
-                    <th className="px-6 py-4 text-right">View</th>
+                    <th className="px-6 py-4 text-center">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -164,12 +164,12 @@ export default function SalesPage() {
                     const color = METHOD_COLOR[sale.paymentMethodId] ?? '';
                     return (
                       <tr key={sale.id} className="hover:bg-primary/5 transition-all group">
-                        <td className="p-5">
+                        <td className="p-5 flex flex-col gap-2 items-start">
                            <span className="font-mono text-[14px] font-bold bg-muted/50 px-2 py-0.5 rounded tracking-tighter">
                              #{sale.id.slice(-8).toUpperCase()}
                            </span>
                            {sale.is_returned && (
-                             <span className="ml-2 px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-bold text-[10px]">
+                             <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-bold text-[10px]">
                                RETURNED
                              </span>
                            )}
@@ -194,7 +194,7 @@ export default function SalesPage() {
                         <td className="p-5 font-bold text-base text-foreground">
                           {currencySymbol}{sale.finalAmount.toFixed(2)}
                         </td>
-                        <td className="p-5 text-right">
+                        <td className="p-5 text-center">
                           <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-primary hover:bg-primary/10" onClick={() => handleView(sale)}>
                             <Eye className="h-5 w-5" />
                           </Button>

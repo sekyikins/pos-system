@@ -9,8 +9,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Product, Category, Supplier } from '@/lib/types';
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories, getSuppliers, addCategory, addSupplier } from '@/lib/db';
+import { deleteProductImage, setPrimaryImage } from '@/lib/db_extended';
 import { useToastStore, useSettingsStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Loader2, Upload, ImageIcon, Boxes, Barcode, Truck, Tag } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, Upload, ImageIcon, Boxes, Barcode, Truck, Tag, Star, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { LiveStatus } from '@/components/ui/LiveStatus';
@@ -51,8 +52,7 @@ export default function ProductsPage() {
     is_returnable: true,
   });
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const fetchSupportingData = useCallback(async () => {
     try {
@@ -97,12 +97,18 @@ export default function ProductsPage() {
     });
   }, [products, searchQuery, sortKey, sortOrder]);
 
+  const modalProduct = useMemo(() => {
+    if (!editingProduct) return null;
+    return products.find(p => p.id === editingProduct.id) || editingProduct;
+  }, [products, editingProduct]);
+
   const handleOpenModal = (product?: Product) => {
+    setSelectedFiles([]);
     if (product) {
       setEditingProduct(product);
       setFormData({
         name: product.name,
-        categoryId: product.category, // In your datalist implementation, category name is used
+        categoryId: product.category,
         category: product.category,
         price: product.price.toString(),
         costPrice: product.costPrice.toString(),
@@ -113,15 +119,12 @@ export default function ProductsPage() {
         supplierName: product.supplierName || '',
         is_returnable: product.is_returnable ?? true,
       });
-      setPreviewUrl(product.image_url || null);
     } else {
       setEditingProduct(null);
       setFormData({
         name: '', categoryId: '', category: '', price: '', costPrice: '', quantity: '',
         barcode: '', description: '', supplierId: '', supplierName: '', is_returnable: true,
       });
-      setPreviewUrl(null);
-      setSelectedFile(null);
     }
     setIsModalOpen(true);
   };
@@ -181,10 +184,10 @@ export default function ProductsPage() {
       };
 
       if (editingProduct) {
-        await updateProduct(editingProduct.id, submissionData, undefined, selectedFile || undefined, undefined, user?.id);
+        await updateProduct(editingProduct.id, submissionData, undefined, selectedFiles.length > 0 ? selectedFiles : undefined, undefined, user?.id);
         addToast('Product updated', 'success');
       } else {
-        await addProduct(submissionData, selectedFile || undefined, user?.id);
+        await addProduct(submissionData, selectedFiles.length > 0 ? selectedFiles : undefined, user?.id);
         addToast('Product added', 'success');
       }
       setIsModalOpen(false);
@@ -380,39 +383,100 @@ export default function ProductsPage() {
 
       <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingProduct ? 'Update Product Entry' : 'Register New Product'}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="overflow-hidden bg-muted/20 border-2 border-dashed border-border rounded-2xl hover:bg-muted/30 transition-all cursor-pointer relative group flex items-center justify-center min-h-[160px]">
-            {previewUrl ? (
-              <div className="relative h-48 w-full">
-                <Image src={previewUrl} alt="Preview" fill className="object-contain p-2" unoptimized />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                  <p className="text-white text-[10px] font-bold uppercase bg-black/50 px-3 py-1.5 rounded-full flex items-center gap-2 tracking-widest">
-                    <Upload className="h-3 w-3" /> Change Representation
-                  </p>
+          {/* Multi-Image Management */}
+          <div className="space-y-3 pt-2">
+            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2 px-1">
+              <ImageIcon className="h-4 w-4 text-primary" /> Product Imagery
+            </label>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Existing Images */}
+              {modalProduct?.images?.map((img) => (
+                <div key={img.id} className="relative aspect-square rounded-xl border-2 border-border overflow-hidden group bg-muted/20">
+                  <Image src={img.image_url} alt="Product" fill className="object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await setPrimaryImage(modalProduct.id, img.id);
+                          addToast('Primary image updated', 'success');
+                          refetch();
+                        } catch {
+                          addToast('Failed to set primary', 'error');
+                        }
+                      }}
+                      className={`p-1.5 rounded-lg ${img.is_primary ? 'bg-warning text-white' : 'bg-white/20 text-white hover:bg-warning'}`}
+                      title="Set as Primary"
+                    >
+                      <Star className={`h-4 w-4 ${img.is_primary ? 'fill-current' : ''}`} />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        if(!confirm('Delete this image?')) return;
+                        try {
+                          await deleteProductImage(img.id);
+                          addToast('Image deleted', 'success');
+                          refetch();
+                        } catch {
+                          addToast('Failed to delete', 'error');
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-red-500/80 text-white hover:bg-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {img.is_primary && (
+                    <div className="absolute top-1.5 left-1.5 bg-warning text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg">PRIMARY</div>
+                  )}
                 </div>
+              ))}
+
+              {/* Upload New Card */}
+              <div className="relative aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 hover:bg-muted/10 transition-colors group cursor-pointer overflow-hidden">
+                <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                <span className="text-[9px] font-black text-muted-foreground group-hover:text-primary uppercase tracking-widest text-center px-2">Attach Files</span>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  className="absolute inset-0 opacity-0 cursor-pointer" 
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) {
+                      setSelectedFiles(prev => [...prev, ...files]);
+                    }
+                  }}
+                />
               </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-6">
-                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-all duration-300">
-                  <Upload className="h-7 w-7" />
-                </div>
-                <div className="text-center">
-                  <p className="text-xs font-bold uppercase tracking-wider">Product Visual</p>
-                  <p className="text-[10px] text-muted-foreground font-bold">WEBP, PNG, JPG (MAX 5MB)</p>
+            </div>
+
+            {/* Selected New Files Previews */}
+            {selectedFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-primary uppercase tracking-widest">Pending Uploads ({selectedFiles.length})</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="relative h-16 w-16 rounded-lg border border-primary/30 overflow-hidden ring-2 ring-primary/10">
+                      <Image src={URL.createObjectURL(file)} alt="Preview" fill className="object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newFiles = [...selectedFiles];
+                          newFiles.splice(idx, 1);
+                          setSelectedFiles(newFiles);
+                        }}
+                        className="absolute top-0.5 right-0.5 bg-red-500 text-white p-0.5 rounded-full shadow-lg"
+                      >
+                        <X className="h-2 w-2" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="absolute inset-0 opacity-0 cursor-pointer" 
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setSelectedFile(file);
-                  setPreviewUrl(URL.createObjectURL(file));
-                }
-              }} 
-            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

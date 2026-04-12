@@ -4,6 +4,58 @@ import { supabase } from './supabase';
 import { adjustInventory, updateProduct, generateReference } from './db';
 import { Sale, OnlineOrder, Category, DeliveryPoint, Expense, PurchaseOrder, PurchaseOrderItem, Promotion, Supplier, StoreSettings, TransactionItem, Return } from './types';
 
+// ─── Products & Images ───────────────────────────────────────────────────────
+export async function uploadProductImage(productId: string, file: File, isPrimary: boolean = false): Promise<void> {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${productId}-${Math.random()}.${fileExt}`;
+  
+  const { error: storageErr } = await supabase.storage
+    .from('Products Images')
+    .upload(fileName, file, { contentType: file.type });
+  
+  if (storageErr) throw new Error(`Image upload failed: ${storageErr.message}`);
+
+  const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
+
+  // Consistency logic
+  const { count } = await supabase.from('product_images').select('*', { count: 'exact', head: true }).eq('product_id', productId);
+  const shouldBePrimary = isPrimary || (count === 0);
+
+  if (shouldBePrimary) {
+    await supabase.from('product_images').update({ is_primary: false }).eq('product_id', productId);
+  }
+
+  await supabase.from('product_images').insert({ product_id: productId, image_url: publicUrl, is_primary: shouldBePrimary });
+}
+
+export async function deleteProductImage(imageId: string): Promise<void> {
+  // Fetch details before delete
+  const { data: img } = await supabase.from('product_images').select('*').eq('id', imageId).maybeSingle();
+  if (!img) return;
+
+  const { error } = await supabase.from('product_images').delete().eq('id', imageId);
+  if (error) throw error;
+
+  // If primary was deleted, pick the next available as primary
+  if (img.is_primary) {
+    const { data: nextImg } = await supabase.from('product_images')
+      .select('id')
+      .eq('product_id', img.product_id)
+      .limit(1)
+      .maybeSingle();
+      
+    if (nextImg) {
+      await supabase.from('product_images').update({ is_primary: true }).eq('id', nextImg.id);
+    }
+  }
+}
+
+export async function setPrimaryImage(productId: string, imageId: string): Promise<void> {
+  await supabase.from('product_images').update({ is_primary: false }).eq('product_id', productId);
+  const { error } = await supabase.from('product_images').update({ is_primary: true }).eq('id', imageId);
+  if (error) throw error;
+}
+
 export async function getCategories(): Promise<Category[]> {
   const { data, error } = await supabase.from('categories').select('*').order('name');
   if (error) throw error;
@@ -470,7 +522,9 @@ export async function getReturns(): Promise<Return[]> {
       items:return_items(*, products(name)),
       customer:customers(name),
       initiated:pos_staff!initiated_by_staff_id(name),
-      processed:pos_staff!processed_by_staff_id(name)
+      processed:pos_staff!processed_by_staff_id(name),
+      order:online_orders(payment_method_id, payment_reference),
+      sale:sales(payment_method_id, payment_reference)
     `)
     .order('requested_at', { ascending: false });
 
@@ -478,35 +532,41 @@ export async function getReturns(): Promise<Return[]> {
   
   return (data || []).map(r => ({
     id: r.id,
-    sale_id: r.sale_id,
-    order_id: r.order_id,
-    customer_id: r.customer_id,
-    initiated_by_staff_id: r.initiated_by_staff_id,
-    processed_by_staff_id: r.processed_by_staff_id,
-    source: r.source as 'IN_STORE' | 'ONLINE',
+    saleId: r.sale_id,
+    orderId: r.order_id,
+    customerId: r.customer_id,
+    customerName: r.customer?.name,
+    initiatedByStaffId: r.initiated_by_staff_id,
+    initiatedByName: r.initiated?.name,
+    processedByStaffId: r.processed_by_staff_id,
+    processedByName: r.processed?.name,
+    source: r.source,
     reason: r.reason,
-    status: r.status as Return['status'],
-    refund_amount: r.refund_amount ? Number(r.refund_amount) : null,
-    rejection_reason: r.rejection_reason,
-    requested_at: r.requested_at,
-    processed_at: r.processed_at,
-    completed_at: r.completed_at,
-    // @ts-expected-ignore - Supabase join typing limits
-    customer_name: r.customer?.name,
-    // @ts-expected-ignore
-    initiated_by_name: r.initiated?.name,
-    // @ts-expected-ignore
-    processed_by_name: r.processed?.name,
-    // @ts-expected-ignore
-    items: r.items?.map((i: { id: string, return_id: string, product_id: string, products: { name: string } | null, quantity: number, unit_price: string | number, subtotal: string | number }) => ({
+    status: r.status,
+    refundAmount: Number(r.refund_amount),
+    rejectionReason: r.rejection_reason,
+    requestedAt: r.requested_at,
+    processedAt: r.processed_at,
+    completedAt: r.completed_at,
+    items: (r.items || []).map((i: { 
+      id: string; 
+      return_id: string; 
+      product_id: string; 
+      products: { name: string } | null; 
+      quantity: number; 
+      unit_price: number | string; 
+      subtotal: number | string; 
+    }) => ({
       id: i.id,
-      return_id: i.return_id,
-      product_id: i.product_id,
-      product_name: i.products?.name,
+      returnId: i.return_id,
+      productId: i.product_id,
+      productName: i.products?.name,
       quantity: i.quantity,
-      unit_price: Number(i.unit_price),
+      unitPrice: Number(i.unit_price),
       subtotal: Number(i.subtotal)
-    })) || []
+    })),
+    paymentMethod: r.order?.payment_method_id || r.sale?.payment_method_id,
+    paymentReference: r.order?.payment_reference || r.sale?.payment_reference
   }));
 }
 
@@ -673,6 +733,25 @@ export async function updateReturnStatus(returnId: string, status: Return['statu
       const { data: prod } = await supabase.from('products').select('quantity').eq('id', item.product_id).single();
       if (prod) {
         await supabase.from('products').update({ quantity: prod.quantity + item.quantity }).eq('id', item.product_id);
+      }
+      
+      // Update returned_quantity in transaction_items
+      const transactionField = ret.sale_id ? 'sale_id' : 'order_id';
+      const parentId = ret.sale_id || ret.order_id;
+      
+      const { data: txItem } = await supabase
+        .from('transaction_items')
+        .select('returned_quantity')
+        .eq(transactionField, parentId)
+        .eq('product_id', item.product_id)
+        .maybeSingle();
+
+      if (txItem) {
+        await supabase
+          .from('transaction_items')
+          .update({ returned_quantity: (txItem.returned_quantity || 0) + item.quantity })
+          .eq(transactionField, parentId)
+          .eq('product_id', item.product_id);
       }
       // Add inventory log
       await supabase.from('inventory').insert({

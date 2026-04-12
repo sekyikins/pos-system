@@ -270,16 +270,19 @@ export default function ReportsPage() {
             { label: 'Total Revenue', value: `${currencySymbol}${totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success/10' },
             { label: 'Net Profit', value: `${currencySymbol}${totalProfit.toFixed(2)}`, icon: TrendingUp, color: 'text-info', bg: 'bg-info/10' },
             { label: 'Gross Margin', value: `${grossMargin.toFixed(1)}%`, icon: BarChart2, color: 'text-primary', bg: 'bg-primary/10' },
-            { label: 'Avg Order Value', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+            { label: 'Avg Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
             { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
           ].map(item => (
             <Card key={item.label}>
-              <CardContent className="pt-5 flex flex-col items-center sm:items-start">
-                <div className={`p-2 rounded-lg mb-3 ${item.bg}`}>
-                  <item.icon className={`h-5 w-5 ${item.color}`} />
-                </div>
-                <div className="text-xl sm:text-2xl font-bold">{item.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
+              <CardHeader className='py-2'>
+                <CardTitle className='flex items-center gap-2'>
+                  <div className={`p-2 rounded-lg flex items-center ${item.bg}`}><item.icon className={`h-5 w-5 ${item.color}`} /></div>
+                  <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-4 px-0 flex items-center sm:items-start">
+                
+                <div className="w-full text-center text-xl sm:text-2xl font-bold">{item.value}</div>
               </CardContent>
             </Card>
           ))

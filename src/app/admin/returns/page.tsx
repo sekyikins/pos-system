@@ -5,11 +5,18 @@ import { useAuth } from '@/lib/auth';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { Return } from '@/lib/types';
 import { getReturns, updateReturnStatus } from '@/lib/db_extended';
-import { Search, RotateCcw, Package, AlertCircle, CheckCircle2, XCircle, Eye } from 'lucide-react';
+import { Search, RotateCcw, CreditCard, Package, AlertCircle, CheckCircle2, Eye } from 'lucide-react';
 import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+
+const STATUS_COLORS: Record<string, string> = {
+  REQUESTED: 'border-warning bg-warning/10 text-warning',
+  APPROVED: 'border-info bg-info/10 text-info',
+  COMPLETED: 'border-success bg-success/10 text-success',
+  REJECTED: 'border-destructive bg-destructive/10 text-destructive',
+};
 
 export default function AdminReturnsPage() {
   const { user } = useAuth();
@@ -39,9 +46,9 @@ export default function AdminReturnsPage() {
       const q = searchQuery.toLowerCase();
       return (
         r.id.toLowerCase().includes(q) ||
-        r.sale_id?.toLowerCase().includes(q) ||
-        r.order_id?.toLowerCase().includes(q) ||
-        r.customer_name?.toLowerCase().includes(q)
+        r.saleId?.toLowerCase().includes(q) ||
+        r.orderId?.toLowerCase().includes(q) ||
+        r.customerName?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -179,21 +186,21 @@ export default function AdminReturnsPage() {
                        #{ret.id.slice(-8).toUpperCase()}
                     </td>
                     <td className="px-6 py-4 font-medium text-primary">
-                       #{ret.sale_id?.slice(-8).toUpperCase() || ret.order_id?.slice(-8).toUpperCase()}
+                       #{ret.saleId?.slice(-8).toUpperCase() || ret.orderId?.slice(-8).toUpperCase()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
-                      {new Date(ret.requested_at).toLocaleDateString()}
+                      {new Date(ret.requestedAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 font-medium text-foreground">
-                      {ret.customer_name || 'Walk-in Customer'}
+                      {ret.customerName || 'Walk-in Customer'}
                     </td>
                     <td className="px-6 py-4 font-bold">
-                      <div className='flex justify-center'>{currencySymbol}{ret.refund_amount?.toFixed(2)}</div>
+                      <div className='flex justify-center'>{currencySymbol}{ret.refundAmount?.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(ret.status)}
                     </td>
-                    <td className="px-6 py-4 text-primary">
+                    <td className="px-6 py-4 text-primary text-center">
                        <Button variant="ghost" size="sm" onClick={() => setSelectedReturn(ret)}><Eye className="h-4.5 w-4.5"/></Button>
                     </td>
                   </tr>
@@ -213,16 +220,15 @@ export default function AdminReturnsPage() {
           size="md"
         >
           <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 bg-muted/20 border border-border rounded-xl">
-               <div>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Return Request</p>
-                  <p className="font-medium text-sm">#{selectedReturn.id.slice(-8).toUpperCase()} <span className="mx-2 text-muted-foreground">·</span> {new Date(selectedReturn.requested_at).toLocaleDateString()}</p>
-               </div>
-               <div className="text-right">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Status</p>
-                  {getStatusBadge(selectedReturn.status)}
-               </div>
-            </div>
+            <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-xl font-bold">Return #{selectedReturn.id.slice(-8).toUpperCase()}</h2>
+                  <p className="text-sm text-muted-foreground">{new Date(selectedReturn.requestedAt).toLocaleString()}</p>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLORS[selectedReturn.status]}`}>
+                  {selectedReturn.status}
+                </div>
+              </div>
 
             <div>
               <p className="text-sm font-bold text-foreground mb-3">Items to Return</p>
@@ -232,8 +238,8 @@ export default function AdminReturnsPage() {
                      <div className="flex items-center gap-3">
                        <div className="h-8 w-8 bg-muted rounded flex items-center justify-center text-muted-foreground"><Package className="h-4 w-4" /></div>
                        <div>
-                         <p className="font-medium">{item.product_name}</p>
-                         <p className="text-xs text-muted-foreground mt-0.5">Purchased at {currencySymbol}{item.unit_price.toFixed(2)}</p>
+                         <p className="font-medium">{item.productName}</p>
+                         <p className="text-xs text-muted-foreground mt-0.5">Purchased at {currencySymbol}{item.unitPrice.toFixed(2)}</p>
                        </div>
                      </div>
                      <div className="text-right">
@@ -243,8 +249,8 @@ export default function AdminReturnsPage() {
                    </div>
                  ))}
                  <div className="p-3 bg-primary/5 flex justify-between items-center border-t-2 border-primary/20">
-                    <span className="text-sm font-bold text-primary">Calculated Refund (80% of items)</span>
-                    <span className="text-lg font-bold text-primary">{currencySymbol}{selectedReturn.refund_amount?.toFixed(2)}</span>
+                    <span className="text-sm font-bold text-primary">Refund Amount</span>
+                    <span className="text-lg font-bold text-primary">{currencySymbol}{selectedReturn.refundAmount?.toFixed(2)}</span>
                  </div>
               </div>
             </div>
@@ -256,11 +262,11 @@ export default function AdminReturnsPage() {
               </div>
             </div>
 
-            {selectedReturn.status === 'REJECTED' && selectedReturn.rejection_reason && (
+            {selectedReturn.status === 'REJECTED' && selectedReturn.rejectionReason && (
               <div>
-                <p className="text-sm font-bold text-destructive mb-2 flex items-center gap-2"><XCircle className="h-4 w-4" /> Rejection Reason</p>
-                <div className="p-4 bg-destructive/10 text-destructive rounded-xl text-sm border border-destructive/20 font-medium">
-                  {selectedReturn.rejection_reason}
+                <p className="text-sm font-bold text-foreground mb-2">Rejection Reason</p>
+                <div className="p-4 bg-destructive/10 rounded-xl border border-destructive/20 text-sm text-destructive font-medium">
+                  {selectedReturn.rejectionReason}
                 </div>
               </div>
             )}
@@ -304,13 +310,27 @@ export default function AdminReturnsPage() {
                   <AlertCircle className="h-5 w-5 shrink-0" />
                   <div>
                     <p className="font-bold mb-1">Process Refund Manually</p>
-                    <p>For Paystack payments, please process the refund of <b>{currencySymbol}{selectedReturn.refund_amount?.toFixed(2)}</b> in your Paystack Dashboard first. For Cash/POD, hand the cash to the customer, then click Confirm below.</p>
+                    <p>For Paystack payments, please process the refund of <b>{currencySymbol}{selectedReturn.refundAmount?.toFixed(2)}</b> in your Paystack Dashboard first. For Cash/POD, hand the cash to the customer, then click Confirm below.</p>
+                    
+                    {selectedReturn.paymentMethod === 'PAYSTACK' && selectedReturn.paymentReference && (
+                      <div className="mt-3">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => window.open(`https://dashboard.paystack.com/#/search?model=transactions&query=${selectedReturn.paymentReference}`, '_blank')}
+                          className="text-info border-info/50 bg-info/5 hover:bg-info/10 font-bold"
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Open Paystack Transaction
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end pt-2">
                   <Button variant="outline" onClick={() => setActionModal(null)}>Cancel</Button>
                   <Button variant="primary" disabled={isProcessing} onClick={handleAction}>
-                    Confirm Refund Complete
+                    Confirm Completed Refund
                   </Button>
                 </div>
               </div>

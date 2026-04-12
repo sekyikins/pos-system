@@ -199,6 +199,7 @@ CREATE TABLE public.transaction_items (
     price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
     cost_price NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
+    returned_quantity INTEGER NOT NULL DEFAULT 0 CHECK (returned_quantity >= 0),
     subtotal NUMERIC(10, 2) NOT NULL CHECK (subtotal >= 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     -- Constraint: item must belong to either a sale or an online order, but not both
@@ -398,6 +399,13 @@ CREATE POLICY "Allow all to public" ON public.return_items FOR ALL USING (true) 
 -- ==========================================
 
 DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END $$;
+
+DO $$
 DECLARE
   tables TEXT[] := ARRAY[
     'online_orders',
@@ -411,7 +419,14 @@ DECLARE
     'payment_methods',
     'promotions',
     'returns',
-    'return_items'
+    'return_items',
+    'categories',
+    'suppliers',
+    'delivery_points',
+    'product_images',
+    'store_settings',
+    'expenses',
+    'product_reviews'
   ];
   t TEXT;
 BEGIN

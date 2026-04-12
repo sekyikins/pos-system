@@ -245,15 +245,17 @@ function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, curr
   return (
     <Card className="overflow-hidden border-2 border-border/50 hover:border-primary/30 transition-all shadow-sm flex flex-col h-full bg-card">
       <div className="p-3 sm:p-4 flex flex-col h-full">
-        <div className="flex justify-between items-start mb-4">
-          <div>
+        <div className="flex flex-col items-start mb-4">
+          <div className='flex gap-2 justify-between items-center w-full'>
             <p className="text-xs font-mono text-muted-foreground">#{order.id.slice(-8).toUpperCase()}</p>
-            <p className="text-sm font-bold text-foreground">{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+            <Badge variant="outline" className={`${meta.color} flex items-center gap-1 font-bold`}>
+              <StatusIcon className="h-3 w-3" />
+              {meta.label}
+            </Badge>
           </div>
-          <Badge variant="outline" className={`${meta.color} flex items-center gap-1 font-bold`}>
-            <StatusIcon className="h-3 w-3" />
-            {meta.label}
-          </Badge>
+          <p className="text-sm font-bold text-foreground uppercase tracking-tight">
+            {new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' })} • {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
         </div>
 
         <div className="space-y-4 flex-1">

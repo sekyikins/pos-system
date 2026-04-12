@@ -3,7 +3,7 @@
  * Replaces mock-db.ts — all data operations go through Supabase.
  */
 import { supabase } from './supabase';
-import { Product, Sale, TransactionItem, InventoryLog, StaffRecord, Customer, Role } from './types';
+import { Product, ProductImage, Sale, TransactionItem, InventoryLog, StaffRecord, Customer, Role } from './types';
 import bcrypt from 'bcryptjs';
 
 // ─── Type Helpers ────────────────────────────────────────────────────────────
@@ -21,6 +21,9 @@ function toProduct(row: any): Product {
   if (!row) return {} as Product;
   
   const supplierInfo = Array.isArray(row.product_suppliers) ? row.product_suppliers[0] : row.product_suppliers;
+  const images = Array.isArray(row.product_images) ? row.product_images : [];
+  const primaryImg = images.find((img: ProductImage) => img.is_primary) || images[0];
+
   return {
     ...row,
     categoryId: row.category_id || row.category,
@@ -28,8 +31,8 @@ function toProduct(row: any): Product {
     price: Number(row.price || 0),
     costPrice: Number(row.cost_price || 0),
     quantity: Number(row.quantity || 0),
-    // Map from product_images table join
-    image_url: Array.isArray(row.product_images) ? row.product_images[0]?.image_url : (row.image_url || undefined),
+    image_url: primaryImg?.image_url,
+    images: images,
     supplierId: supplierInfo?.supplier_id || undefined,
     supplierName: supplierInfo?.suppliers?.name || undefined,
     is_returnable: row.is_returnable,
@@ -98,7 +101,7 @@ function toInventoryLog(row: any): InventoryLog {
 export async function getProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
-    .select('*, product_images(image_url), product_suppliers(supplier_id, suppliers(name)), categories(name)')
+    .select('*, product_images(*), product_suppliers(supplier_id, suppliers(name)), categories(name)')
     .order('name');
   if (error) throw error;
   return (data ?? []).map(toProduct);
@@ -107,7 +110,7 @@ export async function getProducts(): Promise<Product[]> {
 export async function getProductById(id: string): Promise<Product | null> {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select('*, product_images(*), product_suppliers(supplier_id, suppliers(name)), categories(name)')
     .eq('id', id)
     .single();
   if (error) return null;
@@ -124,7 +127,7 @@ export async function getProductByBarcode(barcode: string): Promise<Product | nu
   return toProduct(data);
 }
 
-export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File, staffId?: string): Promise<Product> {
+export async function addProduct(p: Omit<Product, 'id'>, imageFiles?: File[], staffId?: string): Promise<Product> {
   const { data: productRow, error: productErr } = await supabase
     .from('products')
     .insert({ 
@@ -135,6 +138,7 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File, staff
       cost_price: p.costPrice || 0,
       quantity: p.quantity, 
       barcode: p.barcode,
+      description: p.description || '',
       is_returnable: p.is_returnable ?? true
     })
     .select()
@@ -158,20 +162,26 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File, staff
     }
   }
 
-  // 2. Upload image if provided
-  if (imageFile) {
-    const fileExt = imageFile.name.split('.').pop();
-    const fileName = `${product.id}-${Math.random()}.${fileExt}`;
-    const { error: storageErr } = await supabase.storage
-      .from('Products Images')
-      .upload(fileName, imageFile, { contentType: imageFile.type });
-    if (storageErr) {
-      console.error('Storage Upload Error:', storageErr);
-      throw new Error(`Image upload failed: ${storageErr.message}. Ensure the "Products Images" bucket exists and has correct policies.`);
+  // 2. Upload images if provided
+  if (imageFiles && imageFiles.length > 0) {
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${product.id}-${Date.now()}-${i}.${fileExt}`;
+      const { error: storageErr } = await supabase.storage
+        .from('Products Images')
+        .upload(fileName, file, { contentType: file.type });
+      
+      if (!storageErr) {
+        const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
+        // Set first image as primary for new products
+        await supabase.from('product_images').insert({ 
+          product_id: product.id, 
+          image_url: publicUrl, 
+          is_primary: i === 0 
+        });
+      }
     }
-    const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
-    await supabase.from('product_images').insert({ product_id: product.id, image_url: publicUrl });
-    product.image_url = publicUrl;
   }
 
   // Log initial stock to inventory
@@ -188,7 +198,7 @@ export async function addProduct(p: Omit<Product, 'id'>, imageFile?: File, staff
   return product;
 }
 
-export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | string, imageFile?: File, supplierId?: string, staffId?: string, customerId?: string): Promise<Product | null> {
+export async function updateProduct(id: string, updates: Partial<Product>, reasonOverride?: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | string, imageFiles?: File[], supplierId?: string, staffId?: string, customerId?: string): Promise<Product | null> {
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
@@ -197,6 +207,7 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
   if (updates.costPrice !== undefined) row.cost_price = updates.costPrice;
   if (updates.quantity !== undefined) row.quantity = updates.quantity;
   if (updates.barcode !== undefined) row.barcode = updates.barcode;
+  if (updates.description !== undefined) row.description = updates.description;
   if (updates.is_returnable !== undefined) row.is_returnable = updates.is_returnable;
 
   const { data: oldProd } = await supabase.from('products').select('quantity').eq('id', id).single();
@@ -205,11 +216,11 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
     .from('products')
     .update(row)
     .eq('id', id)
-    .select('*, product_images(image_url), product_suppliers(supplier_id, suppliers(name))')
+    .select('*, product_images(*), product_suppliers(supplier_id, suppliers(name)), categories(name)')
     .single();
   if (error) return null;
 
-  // Update Supplier link (Denormalized in product_suppliers)
+  // Update Supplier link
   if (updates.supplierName) {
     let { data: supplier } = await supabase.from('suppliers').select('id').eq('name', updates.supplierName).single();
     if (!supplier) {
@@ -222,28 +233,45 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
     }
   }
 
-  // Upload image if provided
-  if (imageFile) {
-    const fileExt = imageFile.name.split('.').pop();
-    const fileName = `${id}-${Math.random()}.${fileExt}`;
-    const { error: storageErr } = await supabase.storage
-      .from('Products Images')
-      .upload(fileName, imageFile, { contentType: imageFile.type });
-    if (storageErr) {
-      throw new Error(`Image upload failed: ${storageErr.message}`);
+  // Upload images if provided
+  if (imageFiles && imageFiles.length > 0) {
+    const { count } = await supabase.from('product_images').select('*', { count: 'exact', head: true }).eq('product_id', id);
+    
+    for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${id}-${Date.now()}-${i}.${fileExt}`;
+        const { error: storageErr } = await supabase.storage
+          .from('Products Images')
+          .upload(fileName, file, { contentType: file.type });
+        
+        if (!storageErr) {
+          const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
+          const isPrimary = (count === 0 && i === 0);
+          await supabase.from('product_images').insert({ 
+            product_id: id, 
+            image_url: publicUrl, 
+            is_primary: isPrimary 
+          });
+        }
     }
-    const { data: { publicUrl } } = supabase.storage.from('Products Images').getPublicUrl(fileName);
-    await supabase.from('product_images').delete().eq('product_id', id);
-    await supabase.from('product_images').insert({ product_id: id, image_url: publicUrl });
-    data.product_images = [{ image_url: publicUrl }];
+    // Refresh data to include new images and joined data
+    const { data: refreshed } = await supabase
+      .from('products')
+      .select('*, product_images(*), product_suppliers(supplier_id, suppliers(name)), categories(name)')
+      .eq('id', id)
+      .single();
+    if (refreshed) {
+        Object.assign(data, refreshed);
+    }
   }
 
-  // Log to inventory if quantity changed (Single Source of Truth for Logs)
+  // Log to inventory if quantity changed
   if (updates.quantity !== undefined && oldProd) {
     const diff = Number(updates.quantity) - Number(oldProd.quantity);
     if (diff !== 0) {
       const logReason = reasonOverride || (diff > 0 ? 'RESTOCK' : 'ADJUSTMENT');
-      const { error: logErr } = await supabase.from('inventory').insert({
+      await supabase.from('inventory').insert({
         product_id: id,
         change: diff,
         reason: logReason,
@@ -251,12 +279,10 @@ export async function updateProduct(id: string, updates: Partial<Product>, reaso
         staff_id: staffId || null,
         customer_id: customerId || null
       });
-      if (logErr) console.error('Inventory Log Error:', logErr);
     }
   }
 
-  const product = toProduct(data);
-  return product;
+  return toProduct(data);
 }
 
 export async function deleteProduct(id: string): Promise<void> {

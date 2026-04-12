@@ -51,6 +51,7 @@ export function useRealtimeTable<T extends { id: string }>({
   const [data, setData] = useState<T[]>(initialData);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [retrySession, setRetrySession] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
@@ -139,10 +140,12 @@ export function useRealtimeTable<T extends { id: string }>({
         } else if (status === 'CHANNEL_ERROR') {
           setConnectionStatus('error');
           console.error(`[useRealtimeTable] Channel error on "${table}":`, err || 'Check if Realtime is enabled in Supabase Dashboard.');
-          // Simple retry by refetching; hook will re-run if this component unmounts/remounts
-          setTimeout(refetch, 3000);
+          // Increment retrySession to trigger effect re-run and re-subscription
+          setTimeout(() => setRetrySession(s => s + 1), 5000);
         } else if (status === 'TIMED_OUT') {
           setConnectionStatus('disconnected');
+          console.warn(`[useRealtimeTable] Timed out on "${table}".`);
+          setTimeout(() => setRetrySession(s => s + 1), 5000);
         } else {
           setConnectionStatus('connecting');
         }
@@ -157,7 +160,7 @@ export function useRealtimeTable<T extends { id: string }>({
       }
       setConnectionStatus('disconnected');
     };
-  }, [table, schema, filter?.column, filter?.value, disabled, refetchOnChange, refetch]);
+  }, [table, schema, filter?.column, filter?.value, disabled, refetchOnChange, refetch, retrySession]);
 
   return { data, isLoading, connectionStatus, refetch };
 }
