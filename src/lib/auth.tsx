@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthUser, StaffRecord as UserRecord } from './types';
 import { useRouter, usePathname } from 'next/navigation';
+import { useCartStore } from './store';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -30,15 +31,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stored = localStorage.getItem('pos_user');
     
     setTimeout(() => {
+      let userId = 'guest';
       if (stored) {
         try {
           const parsedUser = JSON.parse(stored) as AuthUser;
           setUser(parsedUser);
+          userId = parsedUser.id;
         } catch {
           console.error('Failed to parse user from localStorage');
           localStorage.removeItem('pos_user');
         }
       }
+      
+      const savedCart = localStorage.getItem(`pos-cart-${userId}`);
+      if (savedCart) {
+        try {
+          useCartStore.getState().setItems(JSON.parse(savedCart));
+        } catch {}
+      } else {
+        useCartStore.getState().setItems([]);
+      }
+      
       setIsLoading(false);
     }, 0);
   }, []);
@@ -70,6 +83,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(authUser);
     localStorage.setItem('pos_user', JSON.stringify(authUser));
 
+    const savedCart = localStorage.getItem(`pos-cart-${authUser.id}`);
+    if (savedCart) {
+      try {
+        useCartStore.getState().setItems(JSON.parse(savedCart));
+      } catch {}
+    } else {
+      useCartStore.getState().setItems([]);
+    }
+
     if (newUser.role === 'MANAGER' || newUser.role === 'ADMIN') {
       router.replace('/admin');
     } else if (newUser.role === 'CASHIER') {
@@ -82,6 +104,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     localStorage.removeItem('pos_user');
+    
+    const savedCart = localStorage.getItem(`pos-cart-guest`);
+    if (savedCart) {
+      try {
+        useCartStore.getState().setItems(JSON.parse(savedCart));
+      } catch {}
+    } else {
+      useCartStore.getState().setItems([]);
+    }
+
     router.replace('/');
   };
 

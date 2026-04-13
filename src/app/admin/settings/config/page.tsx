@@ -184,7 +184,7 @@ export default function ConfigPage() {
                         }}
                      >
                        {POPULAR_CURRENCIES.map(c => (
-                         <option key={c.code} value={c.code}>
+                         <option key={c.code} value={c.code} className='text-black'>
                            {c.code} ({c.symbol}) - {c.name}
                          </option>
                        ))}

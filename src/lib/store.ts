@@ -3,6 +3,7 @@ import { Product, SalesItem } from './types';
 
 interface CartState {
   items: SalesItem[];
+  setItems: (items: SalesItem[]) => void;
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number, maxQuantity?: number) => void;
@@ -12,6 +13,7 @@ interface CartState {
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  setItems: (items) => set({ items }),
   addItem: (product: Product, quantity = 1) => {
     set((state) => {
       const existingItem = state.items.find(item => item.productId === product.id);
@@ -60,6 +62,18 @@ export const useCartStore = create<CartState>((set, get) => ({
   clearCart: () => set({ items: [] }),
   getTotal: () => get().items.reduce((total, item) => total + item.subtotal, 0)
 }));
+
+if (typeof window !== 'undefined') {
+  useCartStore.subscribe((state) => {
+    try {
+      const userStr = localStorage.getItem('pos_user');
+      const userId = userStr ? JSON.parse(userStr).id : 'guest';
+      localStorage.setItem(`pos-cart-${userId}`, JSON.stringify(state.items));
+    } catch (e) {
+      console.error('Failed to save cart to localStorage', e);
+    }
+  });
+}
 
 // Simple Toast Notification Store
 interface ToastMessage {
