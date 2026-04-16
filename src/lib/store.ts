@@ -1,9 +1,20 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Product, SalesItem } from './types';
 
 interface CartState {
   items: SalesItem[];
+  selectedCustomerId: string | null;
+  discountValue: string;
+  discountType: 'FLAT' | 'PERCENT';
+  selectedPromoId: string | null;
+  
   setItems: (items: SalesItem[]) => void;
+  setSelectedCustomerId: (id: string | null) => void;
+  setDiscountValue: (value: string) => void;
+  setDiscountType: (type: 'FLAT' | 'PERCENT') => void;
+  setSelectedPromoId: (id: string | null) => void;
+  
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number, maxQuantity?: number) => void;
@@ -11,69 +22,114 @@ interface CartState {
   getTotal: () => number;
 }
 
-export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
-  setItems: (items) => set({ items }),
-  addItem: (product: Product, quantity = 1) => {
-    set((state) => {
-      const existingItem = state.items.find(item => item.productId === product.id);
-      if (existingItem) {
-        // Prevent exceeding available stock
-        const newQuantity = Math.min(existingItem.quantity + quantity, product.quantity);
-        return {
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      selectedCustomerId: null,
+      discountValue: '0',
+      discountType: 'FLAT',
+      selectedPromoId: null,
+
+      setItems: (items) => set({ items }),
+      setSelectedCustomerId: (id) => set({ selectedCustomerId: id }),
+      setDiscountValue: (value) => set({ discountValue: value }),
+      setDiscountType: (type) => set({ discountType: type }),
+      setSelectedPromoId: (id) => set({ selectedPromoId: id }),
+
+      addItem: (product, quantity = 1) => {
+        set((state) => {
+          const existingItem = state.items.find(item => item.productId === product.id);
+          if (existingItem) {
+            const newQuantity = Math.min(existingItem.quantity + quantity, product.quantity);
+            return {
+              items: state.items.map(item =>
+                item.productId === product.id
+                  ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.price }
+                  : item
+              )
+            };
+          }
+          return {
+            items: [...state.items, {
+              id: `item-${Date.now()}`,
+              productId: product.id,
+              productName: product.name,
+              price: product.price,
+              costPrice: product.costPrice || 0,
+              quantity: Math.min(quantity, product.quantity),
+              subtotal: Math.min(quantity, product.quantity) * product.price
+            }]
+          };
+        });
+      },
+      removeItem: (productId) => {
+        set((state) => ({
+          items: state.items.filter(item => item.productId !== productId)
+        }));
+      },
+      updateQuantity: (productId, quantity, maxQuantity) => {
+        const clampedQuantity = maxQuantity !== undefined 
+          ? Math.max(1, Math.min(quantity, maxQuantity)) 
+          : Math.max(1, quantity);
+          
+        set((state) => ({
           items: state.items.map(item =>
-            item.productId === product.id
-              ? { ...item, quantity: newQuantity, subtotal: newQuantity * item.price }
+            item.productId === productId
+              ? { ...item, quantity: clampedQuantity, subtotal: clampedQuantity * item.price }
               : item
           )
-        };
+        }));
+      },
+      clearCart: () => set({ 
+        items: [], 
+        selectedCustomerId: null, 
+        discountValue: '0', 
+        selectedPromoId: null,
+        discountType: 'FLAT'
+      }),
+      getTotal: () => get().items.reduce((total, item) => total + item.subtotal, 0)
+    }),
+    {
+      name: 'pos-cart-v1',
+      storage: {
+        getItem: (name) => {
+          if (typeof window === 'undefined') return null;
+          const userStr = localStorage.getItem('pos_user');
+          const userId = userStr ? JSON.parse(userStr).id : 'guest';
+          const storedValue = localStorage.getItem(`${name}-${userId}`);
+          
+          if (!storedValue) {
+            // Return an empty state wrapper to force clear any previous in-memory state
+            return {
+              state: {
+                items: [],
+                selectedCustomerId: null,
+                discountValue: '0',
+                selectedPromoId: null,
+                discountType: 'FLAT'
+              },
+              version: 0
+            };
+          }
+          return JSON.parse(storedValue);
+        },
+        setItem: (name, value) => {
+          if (typeof window === 'undefined') return;
+          const userStr = localStorage.getItem('pos_user');
+          const userId = userStr ? JSON.parse(userStr).id : 'guest';
+          localStorage.setItem(`${name}-${userId}`, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          if (typeof window === 'undefined') return;
+          const userStr = localStorage.getItem('pos_user');
+          const userId = userStr ? JSON.parse(userStr).id : 'guest';
+          localStorage.removeItem(`${name}-${userId}`);
+        }
       }
-      return {
-        items: [...state.items, {
-          id: `item-${Date.now()}`,
-          productId: product.id,
-          productName: product.name,
-          price: product.price,
-          costPrice: product.costPrice || 0,
-          quantity: Math.min(quantity, product.quantity),
-          subtotal: Math.min(quantity, product.quantity) * product.price
-        }]
-      };
-    });
-  },
-  removeItem: (productId: string) => {
-    set((state) => ({
-      items: state.items.filter(item => item.productId !== productId)
-    }));
-  },
-  updateQuantity: (productId: string, quantity: number, maxQuantity?: number) => {
-    const clampedQuantity = maxQuantity !== undefined 
-      ? Math.min(quantity, maxQuantity) 
-      : quantity;
-      
-    set((state) => ({
-      items: state.items.map(item =>
-        item.productId === productId
-          ? { ...item, quantity: clampedQuantity, subtotal: clampedQuantity * item.price }
-          : item
-      )
-    }));
-  },
-  clearCart: () => set({ items: [] }),
-  getTotal: () => get().items.reduce((total, item) => total + item.subtotal, 0)
-}));
-
-if (typeof window !== 'undefined') {
-  useCartStore.subscribe((state) => {
-    try {
-      const userStr = localStorage.getItem('pos_user');
-      const userId = userStr ? JSON.parse(userStr).id : 'guest';
-      localStorage.setItem(`pos-cart-${userId}`, JSON.stringify(state.items));
-    } catch (e) {
-      console.error('Failed to save cart to localStorage', e);
     }
-  });
-}
+  )
+);
 
 // Simple Toast Notification Store
 interface ToastMessage {
@@ -125,8 +181,8 @@ export interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   storeName: '',
-  currency: 'GHS',
-  currencySymbol: '₵',
+  currency: '',
+  currencySymbol: '_',
   taxRate: 0,
   receiptHeader: null,
   receiptFooter: null,
@@ -147,4 +203,51 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       set({ initialized: true });
     }
   }
+}));
+
+// Global UI / Connection State
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+interface UIState {
+  connectionStatus: ConnectionStatus;
+  instanceStatuses: Record<string, ConnectionStatus>;
+  updateInstanceStatus: (id: string, status: ConnectionStatus) => void;
+  removeInstance: (id: string) => void;
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  connectionStatus: 'connecting',
+  instanceStatuses: {},
+  updateInstanceStatus: (id, status) => set((state) => {
+    const nextStatuses = { ...state.instanceStatuses, [id]: status };
+    
+    // Determine global status
+    const values = Object.values(nextStatuses);
+    let nextGlobal: ConnectionStatus = 'disconnected';
+    
+    if (values.includes('connected')) nextGlobal = 'connected';
+    else if (values.includes('connecting')) nextGlobal = 'connecting';
+    else if (values.includes('error')) nextGlobal = 'error';
+    
+    return { 
+      instanceStatuses: nextStatuses,
+      connectionStatus: nextGlobal
+    };
+  }),
+  removeInstance: (id) => set((state) => {
+    const nextStatuses = { ...state.instanceStatuses };
+    delete nextStatuses[id];
+    
+    const values = Object.values(nextStatuses);
+    let nextGlobal: ConnectionStatus = values.length === 0 ? 'disconnected' : 'connecting';
+    
+    if (values.includes('connected')) nextGlobal = 'connected';
+    else if (values.includes('connecting')) nextGlobal = 'connecting';
+    else if (values.includes('error')) nextGlobal = 'error';
+
+    return {
+      instanceStatuses: nextStatuses,
+      connectionStatus: nextGlobal
+    };
+  }),
 }));

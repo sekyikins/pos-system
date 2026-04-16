@@ -11,6 +11,8 @@ import bcrypt from 'bcryptjs';
 import { useSettingsStore } from '@/lib/store';
 
 
+import { checkRateLimit } from '@/lib/rateLimit';
+
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -25,6 +27,13 @@ export default function LoginPage() {
     setError('');
 
     try {
+      const rateLimitRes = await checkRateLimit(`login_${username}`, 5);
+      if (!rateLimitRes.success) {
+        setError('Too many login attempts. Please try again in a minute.');
+        setIsLoading(false);
+        return;
+      }
+
       const user = await getUserByUsername(username);
       if (!user) {
         setError('Invalid username or password');
@@ -63,6 +72,7 @@ export default function LoginPage() {
             <Input 
               id="username" 
               label="Username" 
+              title='Enter Your Username'
               placeholder="manager/cashier/customer" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -76,6 +86,7 @@ export default function LoginPage() {
               id="password" 
               type="password"
               label="Password" 
+              title='Enter Your Password'
               placeholder="Enter password (hint: 'password')" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -92,6 +103,7 @@ export default function LoginPage() {
           
           <Button 
              type="submit" 
+             title='Sign In to Your Account'
              fullWidth 
              disabled={isLoading}
           >

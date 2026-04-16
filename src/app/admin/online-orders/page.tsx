@@ -12,8 +12,8 @@ import { Search, ShoppingBag, Eye, TrendingUp, Truck } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useSettingsStore } from '@/lib/store';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 const STATUS_BADGE: Record<string, { label: string; class: string }> = {
   PENDING:   { label: 'Pending',   class: 'bg-warning/10 text-warning border-warning/20' },
@@ -33,7 +33,7 @@ export default function OnlineOrdersPage() {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const { data: orders, isLoading, connectionStatus, refetch } = useRealtimeTable<OnlineOrder>({
+  const { data: orders, isLoading, refetch } = useRealtimeTable<OnlineOrder>({
     table: 'online_orders',
     initialData: [],
     fetcher: async () => {
@@ -43,7 +43,8 @@ export default function OnlineOrdersPage() {
       setDeliveryPoints(ptsMap);
       return fetchedOrders;
     },
-    refetchOnChange: true, // orders have joins + camelCase mapper
+    refetchOnChange: true,
+    cacheKey: 'admin-online-orders'
   });
 
 
@@ -98,7 +99,6 @@ export default function OnlineOrdersPage() {
           <h1 className="text-3xl font-bold tracking-tight">Online Orders</h1>
           <p className="text-sm text-muted-foreground">Manage E-commerce storefront orders</p>
         </div>
-        <LiveStatus status={connectionStatus} />
       </div>
 
       {/* Dynamic Summary Stats - Compact */}
@@ -185,24 +185,29 @@ export default function OnlineOrdersPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              <Search className="absolute left-2.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input placeholder="Search by ID, Status, Route..." className="pl-9 h-11 rounded-xl" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
-            <select
+            <div className='relative'>
+              <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-card text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer shadow-sm"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="DELIVERED">Delivered</option>
-              <option value="SHIPPED">Shipped</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="PENDING">Pending</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+              className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer shadow-sm"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="PENDING">Pending</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+              <div className="absolute right-3.5 top-4 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className='px-0 py-0'>
           {isLoading ? (
             <div className="space-y-1">
               {[...Array(6)].map((_, i) => (
@@ -214,9 +219,9 @@ export default function OnlineOrdersPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-border overflow-x-auto">
+            <div className="max-h-[calc(100vh-240px)] border border-border overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted/90 text-xs uppercase font-semibold text-muted-foreground border-b border-border">
+                <thead className="sticky top-0 bg-muted text-xs uppercase font-semibold text-muted-foreground border-b border-border z-20">
                   <tr>
                     <th className="px-6 py-3">Order ID</th>
                     <th className="px-6 py-3">Date</th>
@@ -233,11 +238,11 @@ export default function OnlineOrdersPage() {
                     const statusBadge = STATUS_BADGE[o.status] || { label: o.status, class: 'bg-muted text-muted-foreground' };
                     const isPickup = !!o.deliveryPointId;
                     return (
-                      <tr key={o.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-5 font-mono text-xs gap-2">
-                          <div className='flex justify-center gap-2'>
+                      <tr key={o.id} className="hover:bg-primary/5 transition-colors group">
+                        <td className="p-5">
+                          <div className='flex items-center gap-2'>
                             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-                            {o.id.slice(-8).toUpperCase()}
+                            <CopyableId id={o.id} />
                           </div>
                         </td>
                         <td className="p-5 text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</td>
@@ -272,7 +277,7 @@ export default function OnlineOrdersPage() {
         {selectedOrder && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div><p className="text-xs text-muted-foreground">Order ID</p><p className="font-mono text-sm">{(selectedOrder.id.trim()).slice(-8).toUpperCase()}</p></div>
+              <div><p className="text-xs text-muted-foreground mb-1">Order ID</p><CopyableId id={selectedOrder.id} className="scale-90 origin-left" /></div>
               <div><p className="text-xs text-muted-foreground">Date</p><p className="text-sm">{new Date(selectedOrder.createdAt).toLocaleString()}</p></div>
               <div><p className="text-xs text-muted-foreground">Payment Method</p><p className="text-sm font-medium">{selectedOrder.paymentMethodId.replace(/_/g, ' ')}</p></div>
               <div><p className="text-xs text-muted-foreground">Total Amount</p><p className="text-sm font-bold text-success">{currencySymbol}{selectedOrder.totalAmount.toFixed(2)}</p></div>
@@ -299,7 +304,7 @@ export default function OnlineOrdersPage() {
                     ? 'bg-success/10 border-success/20 text-success'
                     : 'bg-destructive/10 border-destructive/20 text-destructive'
                 }`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
                   <div>
                     <p className="text-xs font-bold uppercase tracking-widest">Order Finalised</p>
                     <p className="text-[11px] opacity-70 mt-0.5">This order is <span className="font-bold">{selectedOrder.status}</span> and cannot be updated further.</p>

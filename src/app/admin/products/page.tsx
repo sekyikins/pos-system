@@ -11,10 +11,10 @@ import { Product, Category, Supplier } from '@/lib/types';
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories, getSuppliers, addCategory, addSupplier } from '@/lib/db';
 import { deleteProductImage, setPrimaryImage } from '@/lib/db_extended';
 import { useToastStore, useSettingsStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Loader2, Upload, ImageIcon, Boxes, Barcode, Truck, Tag, Star, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, Upload, ImageIcon, Barcode, Truck, Tag, Star, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { CopyableId } from '@/components/ui/CopyableId';
 import { useAuth } from '@/lib/auth';
 
 export default function ProductsPage() {
@@ -68,11 +68,12 @@ export default function ProductsPage() {
     fetchSupportingData();
   }, [fetchSupportingData]);
 
-  const { data: products, isLoading, connectionStatus, refetch } = useRealtimeTable<Product>({
+  const { data: products, isLoading, refetch } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-products'
   });
 
   const processedProducts = useMemo(() => {
@@ -221,15 +222,11 @@ export default function ProductsPage() {
           </div>
         ) : (
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-              <Boxes className="h-8 w-8 text-primary" />
-              Products
-            </h1>
-            <p className="text-sm text-muted-foreground font-medium">Manage your store inventory and catalog</p>
+            <h1 className="text-3xl font-bold tracking-tight">Products Catalog</h1>
+            <p className="text-sm text-muted-foreground">Manage your storefront and point-of-sale inventory.</p>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => handleOpenModal()} className="gap-2 shrink-0 h-11 px-6 rounded-xl font-bold shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Add Product
           </Button>
@@ -237,8 +234,8 @@ export default function ProductsPage() {
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -267,13 +264,13 @@ export default function ProductsPage() {
                 <option value="stock-asc">Lowest Stock</option>
                 <option value="stock-desc">Highest Stock</option>
               </select>
-              <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <div className="absolute right-3.5 top-4 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className='px-0 py-0'>
           {isLoading ? (
             <div className="space-y-1">
               {[...Array(6)].map((_, i) => (
@@ -291,9 +288,9 @@ export default function ProductsPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-240px)] overflow-x-auto">
               <table className="w-full text-sm text-left align-middle font-medium">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                   <tr>
                     <th className="p-5">Product</th>
                     <th className="p-5">Category</th>
@@ -322,7 +319,10 @@ export default function ProductsPage() {
                             </div>
                             <div>
                                <p className="font-semibold text-foreground tracking-tight">{product.name}</p>
-                               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/50 px-1.5 py-0.5 rounded">#{product.id.slice(0,8)}</span>
+                               <div className="flex items-center gap-1.5 mt-1">
+                                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">ID:</span>
+                                 <CopyableId id={product.id} className="scale-75 selected:scale-80 origin-left transition-all duration-500" />
+                               </div>
                             </div>
                           </div>
                         </td>
@@ -358,9 +358,9 @@ export default function ProductsPage() {
                              <span className="text-xs italic text-muted-foreground/50 font-medium">No supplier</span>
                            )}
                         </td>
-                        <td className="p-3 font-mono text-[14px] text-muted-foreground font-semibold tracking-tighter">
-                          {product.barcode}
-                        </td>
+                         <td className="p-3">
+                           <CopyableId id={product.barcode} truncate={false} className="bg-primary/5 text-primary scale-90 origin-left" />
+                         </td>
                         <td className="p-5 pr-0">
                           <div className="flex justify-end gap-3">
                             <Button variant="ghost" size="sm" onClick={() => handleOpenModal(product)} className="h-10 w-10 p-0 rounded-xl bg-muted/50 text-info hover:bg-info/20">

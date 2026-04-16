@@ -8,6 +8,7 @@ import { getSaleForReturn, checkReturnEligibility, initiateInStoreReturn } from 
 import { Sale, TransactionItem } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 import { useToastStore, useSettingsStore } from '@/lib/store';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 interface InitiateReturnModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export function InitiateReturnModal({ isOpen, onClose }: InitiateReturnModalProp
   const [saleId, setSaleId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sale, setSale] = useState<Sale | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Return state
   const [reason, setReason] = useState('');
@@ -34,6 +36,7 @@ export function InitiateReturnModal({ isOpen, onClose }: InitiateReturnModalProp
     setSale(null);
     setReason('');
     setReturnQuantities({});
+    setError(null);
   };
 
   const handleClose = () => {
@@ -69,7 +72,7 @@ export function InitiateReturnModal({ isOpen, onClose }: InitiateReturnModalProp
       
       setStep(2);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : String(err), 'error');
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
@@ -133,17 +136,27 @@ export function InitiateReturnModal({ isOpen, onClose }: InitiateReturnModalProp
           <div className="space-y-2">
             <label className="text-sm font-medium">Sale ID / Receipt Number</label>
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 autoFocus
-                placeholder="e.g. 123e4567-e89b-12d3..."
+                placeholder="e.g. e89b12d3..."
                 value={saleId}
-                onChange={e => setSaleId(e.target.value)}
-                className="w-full h-10 pl-10 pr-3 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                onChange={e => {
+                  setSaleId(e.target.value);
+                  if (error) setError(null);
+                }}
+                className={`w-full h-10 pl-10 pr-3 rounded-xl border bg-background focus:outline-none focus:ring-2 ${error ? 'border-destructive focus:ring-destructive/30' : 'border-border focus:ring-primary/30'}`}
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Returns are only allowed within 7 days of purchase. A 20% restocking fee applies.</p>
+            {error ? (
+              <p className="text-xs font-bold text-destructive mt-2 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {error}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-2">Returns are only allowed within 7 days of purchase. A 20% restocking fee applies.</p>
+            )}
           </div>
           
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
@@ -159,7 +172,7 @@ export function InitiateReturnModal({ isOpen, onClose }: InitiateReturnModalProp
           <div className="bg-muted/30 p-4 rounded-xl border border-border flex justify-between items-center">
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Sale Found</p>
-              <p className="font-medium text-sm">#{sale?.id.slice(-8).toUpperCase()}</p>
+              <CopyableId id={sale?.id || ''} className="scale-90 origin-left" />
             </div>
             <div className="text-right">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Date</p>

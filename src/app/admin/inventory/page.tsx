@@ -8,13 +8,14 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Product, InventoryLog, Supplier } from '@/lib/types';
-import { getProducts, getInventoryLogs, adjustInventory, getSuppliers } from '@/lib/db';
+import { getProducts, getInventoryLogs, getSuppliers } from '@/lib/db';
+import { secureAdjustInventory } from '@/app/actions/inventory';
 import { useToastStore } from '@/lib/store';
 import { Search, History, ArrowUpCircle, ArrowDownCircle, AlertCircle, Plus, Loader2, Truck, User } from 'lucide-react';
+import { CopyableId } from '@/components/ui/CopyableId';
 import { useAuth } from '@/lib/auth';
 
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -33,22 +34,22 @@ export default function InventoryPage() {
     getSuppliers().then(setSuppliers).catch(console.error);
   }, []);
 
-  const { data: products, isLoading: productsLoading, connectionStatus: productsStatus, refetch: refetchProducts } = useRealtimeTable<Product>({
+  const { data: products, isLoading: productsLoading, refetch: refetchProducts } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'inv-products'
   });
 
-  const { data: logs, isLoading: logsLoading, connectionStatus: logsStatus, refetch: refetchLogs } = useRealtimeTable<InventoryLog>({
+  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useRealtimeTable<InventoryLog>({
     table: 'inventory',
     initialData: [],
     fetcher: getInventoryLogs,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'inv-logs'
   });
 
-  const connectionStatus = productsStatus === 'connected' && logsStatus === 'connected' ? 'connected' : 
-                          productsStatus === 'error' || logsStatus === 'error' ? 'error' : 'connecting';
 
   const isLoading = productsLoading || logsLoading;
 
@@ -94,9 +95,8 @@ export default function InventoryPage() {
     setIsSaving(true);
     try {
       const supplierId = (adjustReason === 'RESTOCK' || adjustReason === 'PURCHASE_ORDER') ? (selectedSupplierId || undefined) : undefined;
-      const staffId = user?.id;
 
-      await adjustInventory(adjustingProduct.id, amount, adjustReason, supplierId, staffId);
+      await secureAdjustInventory(adjustingProduct.id, amount, adjustReason, supplierId);
       addToast(`Stock adjusted by ${amount > 0 ? '+' : ''}${amount}`, 'success');
       setAdjustingProduct(null);
       setAdjustAmount('');
@@ -122,7 +122,6 @@ export default function InventoryPage() {
             <p className="text-sm text-muted-foreground">Monitor stock levels and view change history</p>
           </div>
         )}
-        <LiveStatus status={connectionStatus} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -154,7 +153,7 @@ export default function InventoryPage() {
                     <option value="adjusted-asc">Oldest Adjusted</option>
                   </select>
                   <div className="absolute right-2.5 top-2.5 pointer-events-none text-muted-foreground/60">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </div>
                 </div>
               </div>
@@ -179,7 +178,7 @@ export default function InventoryPage() {
             ) : (
               <div className="space-y-4">
                 {processedProducts.map((product: Product) => (
-                  <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg border-border bg-muted/20">
+                  <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg border-border bg-muted/20 group">
                     <div className="flex-1 flex flex-col gap-1 mb-3 sm:mb-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{product.name}</span>
@@ -189,14 +188,18 @@ export default function InventoryPage() {
                           <Badge variant="destructive" className="flex items-center gap-1 px-1.5 text-[10px]"><AlertCircle className="w-3 h-3" />Low Stock</Badge>
                         ) : null}
                       </div>
-                      <span className="text-xs text-muted-foreground">Barcode: {product.barcode} · {product.category}</span>
+                      <div className="text-xs text-foreground flex items-center gap-2 flex-wrap">
+                        <span>Barcode:</span>
+                        <CopyableId id={product.barcode} truncate={false} className="scale-75 origin-left" />
+                        <span>· {product.category}</span>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-4 sm:w-[240px]">
                       <div className="text-center">
                         <span className="block text-xl font-bold">{product.quantity}</span>
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">In Stock</span>
                       </div>
-                      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => { setAdjustingProduct(product); setAdjustAmount(''); setAdjustReason('RESTOCK'); }}>
+                      <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => { setAdjustingProduct(product); setSelectedSupplierId(product.supplierId || ''); setAdjustAmount(''); setAdjustReason('RESTOCK'); }}>
                         <Plus className="h-3.5 w-3.5" /> Adjust
                       </Button>
                     </div>

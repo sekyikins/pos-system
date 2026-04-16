@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Wallet, Plus, Search, Trash2, Calendar, User, DollarSign, Loader2, TrendingDown, Receipt } from 'lucide-react';
+import { Plus, Search, Trash2, Calendar, User, DollarSign, Loader2, TrendingDown, Receipt } from 'lucide-react';
 import { Expense } from '@/lib/types';
 import { getExpenses, addExpense, deleteExpense } from '@/lib/db_extended';
 import { useToastStore, useSettingsStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 export default function ExpensesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,11 +23,12 @@ export default function ExpensesPage() {
   const { currencySymbol } = useSettingsStore();
   const { user } = useAuth();
 
-  const { data: expenses, isLoading, connectionStatus, refetch } = useRealtimeTable<Expense>({
+  const { data: expenses, isLoading, refetch } = useRealtimeTable<Expense>({
     table: 'expenses',
     initialData: [],
     fetcher: getExpenses,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-expenses'
   });
 
   // Modal Form State
@@ -95,13 +96,12 @@ export default function ExpensesPage() {
         ) : (
           <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Wallet className="h-8 w-8 text-primary" /> Operating Expenses
+              Operating Expenses
             </h1>
             <p className="text-sm text-muted-foreground font-medium">Log and monitor maintenance and overhead costs</p>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => setIsModalOpen(true)} className="gap-2 shrink-0 h-11 px-6 rounded-xl font-bold shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Log Expense
           </Button>
@@ -145,8 +145,8 @@ export default function ExpensesPage() {
       </div>
 
       <Card className="border-2 border-border/50">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -158,15 +158,15 @@ export default function ExpensesPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 py-0">
           {isLoading ? (
             <div className="p-4 space-y-4">
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-210px)] overflow-x-auto">
               <table className="w-full text-sm font-medium">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                   <tr>
                     <th className="p-5 text-left">Expense Item</th>
                     <th className="p-5 text-left">Date</th>
@@ -183,7 +183,10 @@ export default function ExpensesPage() {
                       <tr key={exp.id} className="hover:bg-primary/5 transition-all group">
                         <td className="p-5">
                           <p className="font-bold text-foreground line-clamp-1">{exp.description}</p>
-                          <span className="text-[10px] text-muted-foreground font-bold tracking-tight bg-muted px-1.5 py-0.5 rounded uppercase">ID: #{exp.id.slice(0, 6)}</span>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">ID:</span>
+                            <CopyableId id={exp.id} truncateLength={6} className="scale-75 origin-left" />
+                          </div>
                         </td>
                         <td className="p-5">
                            <div className="flex items-center gap-2">

@@ -97,7 +97,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <Button variant="outline" fullWidth className="justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowLogoutConfirm(true)}>
             <LogOut className="h-5 w-5" />
-            Sign Out
+            Log Out
           </Button>
         </div>
 
@@ -114,15 +114,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <p className="text-sm font-medium">Are you sure you want to sign out of the Admin Panel? Any unsaved changes may be lost.</p>
+            <p className="text-sm font-medium">Are you sure you want to log out of the Admin Panel? Any unsaved changes may be lost.</p>
           </div>
           
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" autoFocus onClick={() => setShowLogoutConfirm(false)}>
+            <Button title='Cancel' variant="outline" onClick={() => setShowLogoutConfirm(false)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={logout}>
-              Sign Out
+            <Button title='Confirm Log Out' variant="danger" onClick={logout}>
+              Log Out
             </Button>
           </div>
         </div>

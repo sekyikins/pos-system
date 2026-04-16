@@ -8,10 +8,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Category } from '@/lib/types';
 import { getCategories, addCategory, updateCategory, deleteCategory } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Package, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 
 export default function CategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
@@ -21,11 +20,12 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const { addToast } = useToastStore();
 
-  const { data: categories, isLoading, connectionStatus, refetch } = useRealtimeTable<Category>({
+  const { data: categories, isLoading, refetch } = useRealtimeTable<Category>({
     table: 'category',
     initialData: [],
     fetcher: getCategories,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-categories'
   });
 
   const [form, setForm] = useState({ name: '', description: '' });
@@ -88,14 +88,12 @@ export default function CategoriesPage() {
         ) : (
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-              <Package className="h-8 w-8 text-primary" />
               Product Categories
             </h1>
           <p className="text-sm text-muted-foreground font-medium">Classify your inventory for better organization</p>
         </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => { setForm({ name: '', description: '' }); setIsAddOpen(true); }} className="gap-2 shrink-0 h-11 px-6 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Add Category
           </Button>
@@ -103,8 +101,8 @@ export default function CategoriesPage() {
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex items-center gap-2 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex items-center gap-2">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -116,7 +114,7 @@ export default function CategoriesPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 h-[60vh]">
+        <CardContent className="px-0 py-0 max-h-[60vh]">
           {isLoading ? (
             <div className="space-y-0.5">
               {[...Array(4)].map((_, i) => (
@@ -136,7 +134,7 @@ export default function CategoriesPage() {
           ) : (
             <div className="overflow-y-auto max-h-full">
               <table className="w-full text-sm text-left align-middle font-medium border-separate border-spacing-0">
-                <thead className="sticky top-0 z-10 bg-card text-[10px] uppercase font-bold text-muted-foreground/70 shadow-sm">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 shadow-sm z-20">
                   <tr>
                     <th className="px-6 py-4 border-b border-border/50">Category Details</th>
                     <th className="px-6 py-4 border-b border-border/50">Description</th>

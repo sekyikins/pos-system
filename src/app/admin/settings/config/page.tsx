@@ -9,7 +9,6 @@ import { getStoreSettings, updateStoreSettings } from '@/lib/db';
 import { useToastStore, useSettingsStore, SettingsState } from '@/lib/store';
 import { Save, Store, Globe, Percent, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 
 const POPULAR_CURRENCIES = [
@@ -42,7 +41,7 @@ export default function ConfigPage() {
     receiptFooter: ''
   });
 
-  const { data: storeRows, isLoading, connectionStatus, refetch } = useRealtimeTable<StoreSettings>({
+  const { data: storeRows, isLoading, refetch } = useRealtimeTable<StoreSettings>({
     table: 'store_settings',
     initialData: [],
     fetcher: async () => {
@@ -50,6 +49,7 @@ export default function ConfigPage() {
       return [data];
     },
     refetchOnChange: true,
+    cacheKey: 'admin-settings'
   });
 
   useEffect(() => {
@@ -139,13 +139,11 @@ export default function ConfigPage() {
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <Store className="h-8 w-8 text-primary" />
               Store Config
             </h1>
             <p className="text-sm text-muted-foreground font-medium">Core application identity and financial rules</p>
           </div>
         </div>
-        <LiveStatus status={connectionStatus} />
       </div>
 
       <form onSubmit={handleSave} className="space-y-8">

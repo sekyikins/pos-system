@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useCartStore, useToastStore } from '@/lib/store';
 import { getProducts, getProductByBarcode } from '@/lib/db';
@@ -12,6 +12,7 @@ import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { ShoppingCart, ShoppingBag, Search, RotateCcw } from 'lucide-react';
 import { OnlineOrdersList, InitiateReturnModal } from '@/components/pos';
 import { Button } from '@/components/ui/Button';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 export default function POSPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -29,8 +30,30 @@ export default function POSPage() {
     table: 'products',
     initialData: [],
     fetcher: getProducts,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'pos-products'
   });
+
+  const [offlineProducts, setOfflineProducts] = useState<Product[]>([]);
+  const isOnline = useNetworkStatus();
+
+  useEffect(() => {
+    if (products.length > 0) {
+      import('@/lib/offlineDb').then(({ saveProductsOffline }) => {
+        saveProductsOffline(products);
+      });
+    }
+  }, [products]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      import('@/lib/offlineDb').then(({ getOfflineProducts }) => {
+        getOfflineProducts().then(setOfflineProducts);
+      });
+    }
+  }, [isOnline]);
+
+  const displayProducts = isOnline ? products : offlineProducts;
 
   const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -41,6 +64,23 @@ export default function POSPage() {
       return;
     }
     if (lastBarcodeHit === val.trim()) return;
+    
+    // Check locally first if offline or for speed
+    const localMatch = displayProducts.find(p => p.barcode === val.trim());
+    if (localMatch) {
+       setLastBarcodeHit(val.trim());
+       if (localMatch.quantity > 0) {
+         cart.addItem(localMatch);
+         addToast(`✓ Added ${localMatch.name} via barcode`, 'success');
+         setTimeout(() => setSearchQuery(''), 300);
+       } else {
+         addToast(`${localMatch.name} is out of stock`, 'error');
+       }
+       return;
+    }
+
+    if (!isOnline) return;
+
     const match = await getProductByBarcode(val.trim());
     if (match && match.barcode === val.trim()) {
       setLastBarcodeHit(val.trim());
@@ -54,7 +94,7 @@ export default function POSPage() {
     }
   };
 
-  const filteredProducts = products.filter(p =>
+  const filteredProducts = displayProducts.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.barcode.includes(searchQuery) ||
     p.category.toLowerCase().includes(searchQuery.toLowerCase())
@@ -84,14 +124,14 @@ export default function POSPage() {
             <div className="flex bg-muted/30 p-1 rounded-2xl">
              <button
                onClick={() => setView('POS')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-primary'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${view === 'POS' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground cursor-pointer hover:text-primary'}`}
              >
                <ShoppingCart className="h-4 w-4" />
                Checkout
              </button>
              <button
                onClick={() => setView('ONLINE')}
-               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm hover:cursor-pointer font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground hover:text-indigo-600'}`}
+               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all ${view === 'ONLINE' ? 'bg-indigo-600 text-white shadow-md' : 'text-muted-foreground cursor-pointer hover:text-indigo-600'}`}
              >
                <ShoppingBag className="h-4 w-4" />
                Online <span className='hidden sm:block'>Requests</span>
@@ -128,7 +168,6 @@ export default function POSPage() {
             <ProductGrid 
               products={filteredProducts}
               searchQuery={searchQuery}
-              variant="pos"
               onAddToCart={handleAddToCart}
               isLoading={isLoadingProducts}
             />
@@ -139,7 +178,6 @@ export default function POSPage() {
       </div>
 
       <CartSidebar 
-        variant="pos"
         isOpen={isMobileCartOpen}
         onClose={() => setIsMobileCartOpen(false)}
       />

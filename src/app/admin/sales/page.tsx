@@ -12,8 +12,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useSettingsStore } from '@/lib/store';
 
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { TrendingUp } from 'lucide-react';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 const METHOD_ICON: Record<string, React.ElementType> = { CASH: Banknote, PAYSTACK: CreditCard, PAY_ON_DELIVERY: Banknote };
 const METHOD_COLOR: Record<string, string> = { CASH: 'text-success', PAYSTACK: 'text-info', PAY_ON_DELIVERY: 'text-success' };
@@ -24,11 +24,12 @@ export default function SalesPage() {
   const [filterMethod, setFilterMethod] = useState('ALL');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
-  const { data: sales, isLoading, connectionStatus } = useRealtimeTable<Sale>({
+  const { data: sales, isLoading } = useRealtimeTable<Sale>({
     table: 'sales',
     initialData: [],
     fetcher: getSales,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-sales'
   });
 
   const filtered = sales.filter(s => {
@@ -51,12 +52,10 @@ export default function SalesPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-            <ShoppingBag className="h-8 w-8 text-primary" />
             Sales Transactions
           </h1>
           <p className="text-sm text-muted-foreground font-medium">All recorded point-of-sale transactions</p>
         </div>
-        <LiveStatus status={connectionStatus} />
       </div>
 
       {/* Dynamic Summary Stats - Compact */}
@@ -106,8 +105,8 @@ export default function SalesPage() {
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -117,18 +116,23 @@ export default function SalesPage() {
                 onChange={(e) => setSearchQuery(e.target.value)} 
               />
             </div>
-            <select
+            <div className='relative'>
+              <select
               value={filterMethod}
               onChange={(e) => setFilterMethod(e.target.value)}
               className="px-4 h-11 w-full sm:w-[160px] text-sm rounded-xl border-border border bg-muted/20 text-foreground font-bold focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer hover:bg-muted/30 shadow-sm"
-            >
-              <option value="ALL">All Methods</option>
-              <option value="PAYSTACK">Paystack</option>
-              <option value="CASH">Cash</option>
-            </select>
+              >
+                <option value="ALL">All Methods</option>
+                <option value="PAYSTACK">Paystack</option>
+                <option value="CASH">Cash</option>
+              </select>
+              <div className="absolute right-3.5 top-4 pointer-events-none text-muted-foreground/60">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 py-0">
           {isLoading ? (
             <div className="space-y-0.5">
               {[...Array(6)].map((_, i) => (
@@ -143,9 +147,9 @@ export default function SalesPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-240px)] overflow-x-auto">
               <table className="w-full text-sm text-left align-middle font-medium">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                   <tr>
                     <th className="px-6 py-4">Receipt ID</th>
                     <th className="px-6 py-4">Timestamp</th>
@@ -165,9 +169,7 @@ export default function SalesPage() {
                     return (
                       <tr key={sale.id} className="hover:bg-primary/5 transition-all group">
                         <td className="p-5 flex flex-col gap-2 items-start">
-                           <span className="font-mono text-[14px] font-bold bg-muted/50 px-2 py-0.5 rounded tracking-tighter">
-                             #{sale.id.slice(-8).toUpperCase()}
-                           </span>
+                           <CopyableId id={sale.id} />
                            {sale.is_returned && (
                              <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-bold text-[10px]">
                                RETURNED
@@ -216,7 +218,7 @@ export default function SalesPage() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{new Date(selectedSale.timestamp).toLocaleString()}</span></div>
               <div><span className="text-muted-foreground">Method:</span> <span className="font-medium">{selectedSale.paymentMethodId?.replace('_', ' ')}</span></div>
-              <div><span className="text-muted-foreground">Cashier ID:</span> <span className="font-mono text-xs">{selectedSale.cashierId.slice(-8)}</span></div>
+              <div><span className="text-muted-foreground mr-2">Cashier ID:</span> <CopyableId id={selectedSale.cashierId} className="scale-90 origin-left" /></div>
             </div>
             <div className="border border-border rounded-xl overflow-hidden">
               <table className="w-full text-sm">

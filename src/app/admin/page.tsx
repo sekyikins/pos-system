@@ -8,42 +8,45 @@ import { Sale, Product, StaffRecord, TransactionItem } from '@/lib/types';
 import { DollarSign, Package, BarChart2, TrendingUp, AlertTriangle, Users, Monitor, Store, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { useSettingsStore } from '@/lib/store';
 
-// Standardized LiveStatus used instead
+
 
 export default function AdminDashboard() {
   const [cashierFilter, setCashierFilter] = useState<'ALL' | 'ONLINE' | 'INSTORE'>('INSTORE');
   const { currencySymbol, taxRate } = useSettingsStore();
 
-  const { data: products, isLoading: loadingProducts, connectionStatus: prodStatus } = useRealtimeTable<Product>({
+  const { data: products, isLoading: loadingProducts } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
+    cacheKey: 'dash-products'
   });
 
-  const { data: sales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
+  const { data: sales, isLoading: loadingSales } = useRealtimeTable<Sale>({
     table: 'sales',
     initialData: [],
     fetcher: getSales,
+    cacheKey: 'dash-sales'
   });
 
   const { data: staff, isLoading: loadingStaff } = useRealtimeTable<StaffRecord>({
     table: 'pos_staff',
     initialData: [],
     fetcher: getUsers as unknown as () => Promise<StaffRecord[]>,
+    cacheKey: 'dash-staff'
   });
 
   const { data: onlineOrders, isLoading: loadingOnline } = useRealtimeTable<Sale>({
     table: 'online_orders',
     initialData: [],
     fetcher: getStorefrontSales,
+    cacheKey: 'dash-online'
   });
 
+
   const isLoading = loadingProducts || loadingSales || loadingStaff || loadingOnline;
-  const connectionStatus: ConnectionStatus = prodStatus === 'connected' && salesStatus === 'connected' ? 'connected' : prodStatus === 'error' || salesStatus === 'error' ? 'error' : 'connecting';
 
   const stats = useMemo(() => {
     const activeOnlineOrders = onlineOrders.filter(o => o.status !== 'CANCELLED' && !o.is_returned);
@@ -174,12 +177,11 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>
-        <LiveStatus status={connectionStatus} />
       </div>
 
       {/* Stat Cards */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        <Card>
+        <Card className='overflow-hidden'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-primary" />
@@ -190,7 +192,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='overflow-hidden'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
             <TrendingUp className={`h-4 w-4 ${stats.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`} />
@@ -205,7 +207,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='overflow-hidden'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
             <BarChart2 className="h-4 w-4 text-info" />
@@ -218,7 +220,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='overflow-hidden'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Products</CardTitle>
             <Package className="h-4 w-4 text-warning" />
@@ -229,7 +231,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='overflow-hidden'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-destructive">Low Stock Alerts</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -318,7 +320,7 @@ export default function AdminDashboard() {
                 <option value="ONLINE">Online</option>
               </select>
               <div className="absolute right-2 top-2.5 pointer-events-none text-muted-foreground/60">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </div>
             </div>
           </CardHeader>

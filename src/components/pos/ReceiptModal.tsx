@@ -7,6 +7,7 @@ import { getSaleById } from '@/lib/db';
 import { Sale } from '@/lib/types';
 import { ShoppingBag, Printer, Download, CheckCircle2, FileText } from 'lucide-react';
 import { useSettingsStore } from '@/lib/store';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ interface ReceiptModalProps {
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, saleId }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [sale, setSale] = useState<Sale | null>(null);
-  const { storeName, currencySymbol, receiptHeader, receiptFooter } = useSettingsStore();
+  const { storeName, currency, currencySymbol, receiptHeader, receiptFooter } = useSettingsStore();
 
   useEffect(() => {
     if (!saleId || !isOpen) return;
@@ -41,26 +42,26 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
   const handleDownloadText = () => {
     const lines: string[] = [
-      `=====      ${storeName}     =====`,
+      `=======      ${storeName}     =======`,
       receiptHeader ? `${receiptHeader}` : '',
-      `Date:    ${new Date(sale.timestamp).toLocaleString()}`,
-      `Receipt: #${sale.id}`,
-      `----------------------------`,
-      ...sale.items.map(item => `${(item.productName || 'Unknown').substring(0, 20).padEnd(20)} ${item.quantity}x ${currencySymbol}${item.price.toFixed(2)} = ${currencySymbol}${item.subtotal.toFixed(2)}`),
-      `----------------------------`,
-      sale.discount > 0 ? `Discount:         -${currencySymbol}${sale.discount.toFixed(2)}` : '',
-      `TOTAL:             ${currencySymbol}${sale.finalAmount.toFixed(2)}`,
-      ...(sale.promoName ? [`Promotion:        ${sale.promoName}`] : []),
-      `PAYMENT: ${sale.paymentMethodId}`,
-      `============================`,
-      receiptFooter ? `${receiptFooter}` : `       Thank you!`,
+      `Date:                ${new Date(sale.timestamp).toLocaleString()}`,
+      `Receipt:             #${sale.id.slice(-8)}`,
+      `---------------------------------`,
+      ...sale.items.map(item => `${(item.productName || 'Unknown').substring(0, 20).padEnd(20)} ${item.quantity} x ${currencySymbol}${item.price.toFixed(2)} = ${currencySymbol}${item.subtotal.toFixed(2)}`),
+      `---------------------------------`,
+      sale.discount > 0 ? `Discount:            -${currencySymbol}${sale.discount.toFixed(2)}` : '',
+      `TOTAL:               ${currencySymbol}${sale.finalAmount.toFixed(2)}`,
+      ...(sale.promoName ? [`Promotion:           ${sale.promoName}`] : []),
+      `PAYMENT:             ${sale.paymentMethodId}`,
+      `=================================`,
+      receiptFooter ? `${receiptFooter}` : `            Thank you!`,
     ].filter(Boolean);
 
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `receipt-${sale.id}.txt`;
+    a.download = `Receipt-${sale.id.slice(-8)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -69,6 +70,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
     try {
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ unit: 'mm', format: [80, 200], orientation: 'portrait' });
+      const safeCurrency = currency || 'GHS';
 
       let y = 10;
       const center = (text: string, size = 10) => {
@@ -90,30 +92,36 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
       if (receiptHeader) center(receiptHeader.split('\n')[0], 8);
       y += 2;
       line();
+      y+=3
 
-      row('Date:', new Date(sale.timestamp).toLocaleDateString(), 8);
+      row('Date:', new Date(sale.timestamp).toLocaleString(), 8);
       row('Receipt:', `#${sale.id.slice(-8)}`, 8);
-      row('Cashier:', sale.cashierId, 8);
+      row('Cashier:', sale.cashierId.slice(-8), 8);
       line();
+      y+=3
 
       sale.items.forEach(item => {
-        row(`${(item.productName || 'Unknown').substring(0, 22)}`, `${currencySymbol}${item.subtotal.toFixed(2)}`);
+        doc.setFont('courier', 'bold');
+        row(`${(item.productName || 'Unknown').substring(0, 22)}`, `${safeCurrency} ${item.subtotal.toFixed(2)}`);
+        doc.setFont('courier', 'normal');
         doc.setFontSize(7);
-        doc.setTextColor(120);
-        doc.text(`  ${item.quantity} x ${currencySymbol}${item.price.toFixed(2)}`, 5, y);
-        doc.setTextColor(0);
+        y -= 3;
+        doc.text(`${item.quantity} x ${safeCurrency} ${item.price.toFixed(2)}`, 5, y);
         y += 5;
       });
 
       line();
-      if (sale.discount > 0) row('Discount:', `-${currencySymbol}${sale.discount.toFixed(2)}`, 9);
-      doc.setFont(undefined!, 'bold');
-      row('TOTAL:', `${currencySymbol}${sale.finalAmount.toFixed(2)}`, 11);
-      doc.setFont(undefined!, 'normal');
-      if (sale.promoName) row('Promotion:', sale.promoName, 8);
+      y+=3
+      doc.setFont('courier', 'bold');
+      if (sale.discount > 0) row('Discount:', `-${safeCurrency} ${sale.discount.toFixed(2)}`, 9);
+      y-=2
+      if (sale.promoName) row('Promo applied:', sale.promoName, 8);
+      y+=2
+      row('TOTAL:', `${safeCurrency} ${sale.finalAmount.toFixed(2)}`, 10);
       row('Payment:', sale.paymentMethodId, 8);
       y += 3;
       line();
+      y +=3
 
       center(receiptFooter || 'Thank you for shopping with us!', 9);
 
@@ -152,7 +160,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
         <div className="space-y-0.5 text-muted-foreground mb-3 text-[10px]">
           <div className="flex justify-between"><span>Date:</span><span>{new Date(sale.timestamp).toLocaleString()}</span></div>
-          <div className="flex justify-between"><span>Receipt:</span><span>#{sale.id.slice(-8)}</span></div>
+          <div className="flex justify-between items-center">
+            <span>Receipt:</span>
+            <CopyableId id={sale.id} className="scale-75 origin-right" />
+          </div>
         </div>
 
         <div className="border-t border-dashed border-border pt-3 mb-3 space-y-2">
@@ -196,7 +207,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
       {/* Action Buttons */}
       <div className="grid grid-cols-3 gap-2">
-        <Button variant="outline" onClick={handlePrint} className="gap-1 text-xs">
+        <Button variant="secondary" onClick={handlePrint} className="gap-1 text-xs">
           <Printer className="h-3.5 w-3.5" /> Print
         </Button>
         <Button variant="secondary" onClick={handleDownloadText} className="gap-1 text-xs">

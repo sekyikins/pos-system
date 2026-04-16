@@ -8,10 +8,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Supplier } from '@/lib/types';
 import { getSuppliers, addSupplier, updateSupplier, deleteSupplier } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
-import { Plus, Search, Edit, Trash2, Truck, User, Phone, Mail, MapPin, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, User, Phone, Mail, MapPin, ArrowUpDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 
 type SortKey = 'name' | 'contact' | 'date';
 
@@ -26,11 +25,12 @@ export default function SuppliersPage() {
   const { addToast } = useToastStore();
   const [form, setForm] = useState({ name: '', contactPerson: '', email: '', phone: '', address: '' });
 
-  const { data: suppliers, isLoading, connectionStatus, refetch } = useRealtimeTable<Supplier>({
+  const { data: suppliers, isLoading, refetch } = useRealtimeTable<Supplier>({
     table: 'suppliers',
     initialData: [],
     fetcher: getSuppliers,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-suppliers'
   });
 
   const processed = useMemo(() => {
@@ -120,14 +120,12 @@ export default function SuppliersPage() {
         ) : (
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Truck className="h-8 w-8 text-primary" />
               Supplier Management
             </h1>
             <p className="text-sm text-muted-foreground font-medium">Manage your product vendors and contact details</p>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Add Supplier
           </Button>
@@ -135,8 +133,8 @@ export default function SuppliersPage() {
       </div>
 
       <Card className="border-2 border-border/50">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -165,13 +163,13 @@ export default function SuppliersPage() {
                 <option value="date-desc">Newest First</option>
                 <option value="date-asc">Oldest First</option>
               </select>
-              <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <div className="absolute right-3.5 top-4 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 py-0">
           {isLoading ? (
             <div className="space-y-0">
               {[...Array(5)].map((_, i) => (
@@ -190,9 +188,9 @@ export default function SuppliersPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-210px)] overflow-x-auto">
               <table className="w-full text-sm text-left align-middle font-medium">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                   <tr>
                     <th className="px-6 py-4">Supplier</th>
                     <th className="px-6 py-4">Contact Person</th>

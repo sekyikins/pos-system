@@ -9,8 +9,7 @@ import { getStorefrontSales } from '@/lib/db_extended';
 import { TrendingUp, Package, DollarSign, BarChart2, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useRealtimeTable, ConnectionStatus } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { useRealtimeTable } from '@/hooks/useRealtimeTable';
 import { useSettingsStore } from '@/lib/store';
 
 interface ProductStat { name: string; category: string; unitsSold: number; revenue: number; }
@@ -23,25 +22,28 @@ export default function ReportsPage() {
   const [paymentFilter, setPaymentFilter] = React.useState<string>('ALL');
   const [sortBy, setSortBy] = React.useState<'revenue' | 'unitsSold'>('revenue');
 
-  const { data: posSales, isLoading: loadingSales, connectionStatus: salesStatus } = useRealtimeTable<Sale>({
+  const { data: posSales, isLoading: loadingSales } = useRealtimeTable<Sale>({
     table: 'sales',
     initialData: [],
     fetcher: getSales,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'reports-sales'
   });
 
-  const { data: onlineSales, isLoading: loadingOnline, connectionStatus: onlineStatus } = useRealtimeTable<Sale>({
+  const { data: onlineSales, isLoading: loadingOnline } = useRealtimeTable<Sale>({
     table: 'online_orders',
     initialData: [],
     fetcher: getStorefrontSales,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'reports-online'
   });
 
-  const { data: products, isLoading: loadingProducts, connectionStatus: productsStatus } = useRealtimeTable<Product>({
+  const { data: products, isLoading: loadingProducts } = useRealtimeTable<Product>({
     table: 'products',
     initialData: [],
     fetcher: getProducts,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'reports-products'
   });
 
 
@@ -60,9 +62,6 @@ export default function ReportsPage() {
   }, [reportSource, posSales, onlineSales, statusFilter, paymentFilter]);
 
   const isLoading = loadingSales || loadingProducts || loadingOnline;
-  const connectionStatus: ConnectionStatus =
-    salesStatus === 'connected' && productsStatus === 'connected' && onlineStatus === 'connected' ? 'connected' :
-    salesStatus === 'error' || productsStatus === 'error' || onlineStatus === 'error' ? 'error' : 'connecting';
 
   // ─── Compute stats (memoized) ────────────────────────────────────
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.finalAmount, 0), [sales]);
@@ -210,7 +209,6 @@ export default function ReportsPage() {
           </div>
         )}
         <div className="flex justify-end items-center gap-4 flex-wrap">
-          <LiveStatus status={connectionStatus} />
           <div className="flex gap-2 ml-4">
             {reportSource === 'STOREFRONT' && (
               <select
@@ -273,7 +271,7 @@ export default function ReportsPage() {
             { label: 'Avg Order', value: `${currencySymbol}${avgOrderValue.toFixed(2)}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
             { label: 'Discounts', value: `${currencySymbol}${totalDiscount.toFixed(2)}`, icon: ArrowUp, color: 'text-warning', bg: 'bg-warning/10' },
           ].map(item => (
-            <Card key={item.label}>
+            <Card key={item.label} className='overflow-hidden'>
               <CardHeader className='py-2'>
                 <CardTitle className='flex items-center gap-2'>
                   <div className={`p-2 rounded-lg flex items-center ${item.bg}`}><item.icon className={`h-5 w-5 ${item.color}`} /></div>

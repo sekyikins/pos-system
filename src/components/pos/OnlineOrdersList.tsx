@@ -11,7 +11,7 @@ import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/lib/auth';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   PENDING:   { label: 'Pending',     color: 'bg-warning/10 text-warning border-warning/20',         icon: Clock },
@@ -36,10 +36,11 @@ export function OnlineOrdersList() {
     table: 'pos_staff',
     initialData: [],
     fetcher: getUsers,
+    cacheKey: 'pos-staff'
   });
 
   // ── Realtime online orders ────────────────────────────────────────
-  const { data: orders, isLoading, connectionStatus, refetch } = useRealtimeTable<OnlineOrder>({
+  const { data: orders, isLoading, refetch } = useRealtimeTable<OnlineOrder>({
     table: 'online_orders',
     initialData: [],
     fetcher: async () => {
@@ -51,6 +52,7 @@ export function OnlineOrdersList() {
     },
     // online_orders are fetched with joins and a camelCase mapper — refetch on any change
     refetchOnChange: true,
+    cacheKey: 'pos-online-orders'
   });
 
   // ── Actions ───────────────────────────────────────────────────────
@@ -180,7 +182,6 @@ export function OnlineOrdersList() {
           </div>
           <div className="flex items-center justify-between md:justify-end gap-6 px-1">
              <div className="flex items-center gap-2">
-                <LiveStatus status={connectionStatus} />
              </div>
           </div>
         </div>
@@ -245,18 +246,19 @@ function OrderCard({ order, staff, deliveryPoints, currentUser, isUpdating, curr
   return (
     <Card className="overflow-hidden border-2 border-border/50 hover:border-primary/30 transition-all shadow-sm flex flex-col h-full bg-card">
       <div className="p-3 sm:p-4 flex flex-col h-full">
-        <div className="flex flex-col items-start mb-4">
-          <div className='flex gap-2 justify-between items-center w-full'>
-            <p className="text-xs font-mono text-muted-foreground">#{order.id.slice(-8).toUpperCase()}</p>
-            <Badge variant="outline" className={`${meta.color} flex items-center gap-1 font-bold`}>
-              <StatusIcon className="h-3 w-3" />
-              {meta.label}
-            </Badge>
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Order ID</span>
+            <CopyableId id={order.id} className="scale-90 origin-left" />
           </div>
-          <p className="text-sm font-bold text-foreground uppercase tracking-tight">
-            {new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' })} • {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </p>
+          <Badge variant="outline" className={`${meta.color} py-1 px-3 rounded-full font-bold flex items-center gap-1.5`}>
+            <StatusIcon className="h-3.5 w-3.5" />
+            {meta.label}
+          </Badge>
         </div>
+        <p className="text-sm font-bold text-foreground uppercase tracking-tight mb-4">
+          {new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' })} • {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </p>
 
         <div className="space-y-4 flex-1">
           <div className="bg-muted/30 rounded-2xl p-3 sm:p-4">

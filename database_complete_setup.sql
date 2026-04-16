@@ -426,7 +426,10 @@ DECLARE
     'product_images',
     'store_settings',
     'expenses',
-    'product_reviews'
+    'product_reviews',
+    'payments',
+    'purchase_orders',
+    'purchase_order_items'
   ];
   t TEXT;
 BEGIN

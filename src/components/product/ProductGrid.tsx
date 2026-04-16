@@ -3,11 +3,11 @@ import { Product } from '@/lib/types';
 import { Plus, LayoutGrid } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useSettingsStore } from '@/lib/store';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 interface ProductGridProps {
   products: Product[];
   searchQuery: string;
-  variant: 'pos' | 'storefront';
   onAddToCart: (product: Product) => void;
   isLoading?: boolean;
 }
@@ -35,7 +35,6 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, searchQuery,
     );
   }
 
-
   if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
@@ -48,12 +47,17 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, searchQuery,
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4">
       {products.map(product => (
-        <div key={product.id} className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/50 transition-all flex flex-col shadow-sm hover:shadow-md">
+        <div key={product.id} className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/50 transition-all flex flex-col shadow-sm hover:shadow-md group">
           <div className="p-3 md:p-4 flex-1 flex flex-col">
             <div className="flex justify-between items-start mb-2">
                <h3 className="font-bold text-sm md:text-base leading-tight line-clamp-2 pr-2">{product.name}</h3>
             </div>
-            <p className="text-[10px] md:text-xs text-muted-foreground mb-3 mt-auto uppercase tracking-wider font-semibold">{product.category}</p>
+            <div className="flex flex-wrap justify-between items-center gap-1 mb-3 mt-auto">
+              <p className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider font-semibold">{product.category}</p>
+              <div className="flex">
+                <CopyableId id={product.barcode} truncate={false} className="scale-[0.6] origin-right bg-muted/30" />
+              </div>
+            </div>
             <div className="flex items-end justify-between">
               <span className="font-bold text-lg md:text-xl">{currencySymbol}{product.price.toFixed(2)}</span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border leading-tight ${
@@ -70,7 +74,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, searchQuery,
             disabled={product.quantity <= 0}
             className="w-full bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-semibold py-2.5 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:hover:bg-primary/10 disabled:hover:text-primary disabled:cursor-not-allowed hover:cursor-pointer text-sm"
           >
-            <Plus className="h-4 w-4 shrink-0" /> Add to Cart
+            <Plus className="h-4 w-4 shrink-0" /> Add to Order
           </button>
         </div>
       ))}

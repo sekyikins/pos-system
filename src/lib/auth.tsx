@@ -1,9 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AuthUser, StaffRecord as UserRecord } from './types';
 import { useRouter, usePathname } from 'next/navigation';
 import { useCartStore } from './store';
+import { setSessionCookie, clearSessionCookie } from '@/app/actions/auth';
+import { supabase } from './supabase';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -31,26 +33,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stored = localStorage.getItem('pos_user');
     
     setTimeout(() => {
-      let userId = 'guest';
       if (stored) {
         try {
           const parsedUser = JSON.parse(stored) as AuthUser;
           setUser(parsedUser);
-          userId = parsedUser.id;
         } catch {
           console.error('Failed to parse user from localStorage');
           localStorage.removeItem('pos_user');
         }
       }
       
-      const savedCart = localStorage.getItem(`pos-cart-${userId}`);
-      if (savedCart) {
-        try {
-          useCartStore.getState().setItems(JSON.parse(savedCart));
-        } catch {}
-      } else {
-        useCartStore.getState().setItems([]);
-      }
+      // Trigger store to load the correct user's cart
+      useCartStore.persist.rehydrate();
       
       setIsLoading(false);
     }, 0);
@@ -76,21 +70,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, pathname, router, isLoading]);
 
-  const login = (newUser: UserRecord) => {
+  const login = useCallback(async (newUser: UserRecord) => {
     // Exclude passwordHash before storing — result is a proper AuthUser
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _, ...authUser } = newUser;
     setUser(authUser);
     localStorage.setItem('pos_user', JSON.stringify(authUser));
+    await setSessionCookie(authUser);
 
-    const savedCart = localStorage.getItem(`pos-cart-${authUser.id}`);
-    if (savedCart) {
-      try {
-        useCartStore.getState().setItems(JSON.parse(savedCart));
-      } catch {}
-    } else {
-      useCartStore.getState().setItems([]);
-    }
+    // Rehydrate store with the new user's cart
+    await useCartStore.persist.rehydrate();
 
     if (newUser.role === 'MANAGER' || newUser.role === 'ADMIN') {
       router.replace('/admin');
@@ -99,23 +88,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       router.replace('/');
     }
-  };
+  }, [router]);
 
-  const logout = () => {
+  const logout = useCallback(async () => {
     setUser(null);
     localStorage.removeItem('pos_user');
+    await clearSessionCookie();
     
-    const savedCart = localStorage.getItem(`pos-cart-guest`);
-    if (savedCart) {
-      try {
-        useCartStore.getState().setItems(JSON.parse(savedCart));
-      } catch {}
-    } else {
-      useCartStore.getState().setItems([]);
-    }
+    // Rehydrate store with guest cart (or empty)
+    await useCartStore.persist.rehydrate();
 
     router.replace('/');
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (!user || isLoading) return;
+
+    const channel = supabase
+      .channel(`staff-status-${user.id}`)
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'pos_staff',
+        filter: `id=eq.${user.id}`
+      }, () => {
+        logout();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isLoading, logout]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isLoading }}>

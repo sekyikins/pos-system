@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Badge } from '@/components/ui/Badge';
 import { Promotion } from '@/lib/types';
 import { getPromotions, addPromotion, updatePromotion, deletePromotion } from '@/lib/db';
 import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, Ticket, Loader2, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 // ─── Status Helper ────────────────────────────────────────────────────────────
 type PromoStatus = 'active' | 'past' | 'upcoming' | 'manual-active' | 'manual-inactive';
@@ -53,11 +52,12 @@ export default function PromotionsPage() {
   const { addToast } = useToastStore();
   const { currencySymbol } = useSettingsStore();
 
-  const { data: promotions, isLoading, connectionStatus, refetch } = useRealtimeTable<Promotion>({
+  const { data: promotions, isLoading, refetch } = useRealtimeTable<Promotion>({
     table: 'promotions',
     initialData: [],
     fetcher: getPromotions,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-promotions'
   });
 
   const [form, setForm] = useState({
@@ -173,14 +173,12 @@ export default function PromotionsPage() {
         ) : (
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2 tracking-tight">
-              <Ticket className="h-8 w-8 text-primary" />
               Promotions &amp; Offers
             </h1>
             <p className="text-sm text-muted-foreground font-medium">Manage discounts and seasonal campaigns</p>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => { resetForm(); setIsAddOpen(true); }} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Add Promotion
           </Button>
@@ -188,8 +186,8 @@ export default function PromotionsPage() {
       </div>
 
       <Card className="border-2 border-border/50 overflow-hidden">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex items-center gap-2 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex items-center gap-2">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input
@@ -201,7 +199,7 @@ export default function PromotionsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 py-0">
           {isLoading ? (
             <div className="space-y-0.5">
               {[...Array(4)].map((_, i) => (
@@ -216,9 +214,9 @@ export default function PromotionsPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-210px)] overflow-x-auto">
               <table className="w-full text-sm text-left align-middle font-medium">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                   <tr>
                     <th className="px-6 py-4">Campaign Name</th>
                     <th className="px-6 py-4">Code</th>
@@ -255,9 +253,7 @@ export default function PromotionsPage() {
                           </div>
                         </td>
                         <td className="p-5">
-                          <Badge variant="outline" className="font-mono text-xs px-2 py-0.5 rounded-lg border-primary/20 bg-primary/5 text-primary">
-                            {p.code}
-                          </Badge>
+                          <CopyableId id={p.code} truncate={false} className="bg-primary/5 text-primary scale-90 origin-left" />
                         </td>
                         <td className="p-5 font-bold">
                           {p.discountType === 'PERCENT' ? `${p.discountValue}%` : `${currencySymbol}${p.discountValue}`}

@@ -10,6 +10,7 @@ import { useToastStore, useSettingsStore } from '@/lib/store';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 const STATUS_COLORS: Record<string, string> = {
   REQUESTED: 'border-warning bg-warning/10 text-warning',
@@ -36,7 +37,8 @@ export default function AdminReturnsPage() {
     table: 'returns',
     initialData: [],
     fetcher: getReturns,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-returns'
   });
 
   const filteredReturns = returns.filter(r => {
@@ -105,24 +107,20 @@ export default function AdminReturnsPage() {
       </div>
 
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between gap-4">
-          <div className="flex rounded-xl bg-muted/50 p-1 w-full sm:w-auto overflow-x-auto">
-             <button
-               onClick={() => setActiveTab('IN_STORE')}
-               className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'IN_STORE' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-             >
-               In-Store Returns
-             </button>
-             <button
-               onClick={() => setActiveTab('ONLINE')}
-               className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'ONLINE' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-             >
-               Online Returns
-             </button>
+        <div className="p-4 border-b border-border bg-muted/20 flex flex-wrap justify-between gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search Return/Order ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-10 pl-10 pr-4 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm w-full sm:w-72"
+            />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-             <select
+          <div className="flex flex-wrap gap-3">
+            <select
                value={filterStatus}
                onChange={(e) => setFilterStatus(e.target.value)}
                className="h-10 px-3 text-sm rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -133,22 +131,28 @@ export default function AdminReturnsPage() {
                <option value="COMPLETED">Completed (Refunded)</option>
                <option value="REJECTED">Rejected</option>
              </select>
-             <div className="relative">
-               <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-               <input
-                 type="text"
-                 placeholder="Search Return/Order ID..."
-                 value={searchQuery}
-                 onChange={(e) => setSearchQuery(e.target.value)}
-                 className="h-10 pl-10 pr-4 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm w-full sm:w-64"
-               />
-             </div>
+            <div className="flex rounded-xl bg-muted/50 p-1 w-auto">
+             <button
+               onClick={() => setActiveTab('IN_STORE')}
+               className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'IN_STORE' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'}`}
+             >
+               In-Store Returns
+             </button>
+             <button
+               onClick={() => setActiveTab('ONLINE')}
+               className={`flex-1 sm:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'ONLINE' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground cursor-pointer'}`}
+             >
+               Online Returns
+             </button>
+          </div>
+             
+             
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[calc(100vh-200px)] overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-muted/30 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
+            <thead className="sticky top-0 bg-muted text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="px-6 py-4">Return ID</th>
                 <th className="px-6 py-4">{activeTab === 'IN_STORE' ? 'Sale ID' : 'Order ID'}</th>
@@ -181,12 +185,12 @@ export default function AdminReturnsPage() {
                 </tr>
               ) : (
                 filteredReturns.map(ret => (
-                  <tr key={ret.id} className="hover:bg-primary/5 transition-colors">
+                  <tr key={ret.id} className="hover:bg-primary/5 transition-colors group">
                     <td className="px-6 py-4 font-medium text-foreground">
-                       #{ret.id.slice(-8).toUpperCase()}
+                       <CopyableId id={ret.id} />
                     </td>
                     <td className="px-6 py-4 font-medium text-primary">
-                       #{ret.saleId?.slice(-8).toUpperCase() || ret.orderId?.slice(-8).toUpperCase()}
+                       <CopyableId id={ret.saleId || ret.orderId || ''} className="bg-primary/5 text-primary" />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
                       {new Date(ret.requestedAt).toLocaleDateString()}
@@ -222,7 +226,10 @@ export default function AdminReturnsPage() {
           <div className="space-y-6">
             <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h2 className="text-xl font-bold">Return #{selectedReturn.id.slice(-8).toUpperCase()}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold">Return</h2>
+                    <CopyableId id={selectedReturn.id} />
+                  </div>
                   <p className="text-sm text-muted-foreground">{new Date(selectedReturn.requestedAt).toLocaleString()}</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLORS[selectedReturn.status]}`}>

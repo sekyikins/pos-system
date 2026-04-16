@@ -2,18 +2,19 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useCartStore } from '@/lib/store';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import {
-  ShoppingBag, LogIn, LogOut, LayoutDashboard, Calculator,
-  ShoppingCart, Menu, AlertTriangle
+  ShoppingBag, LogOut, ShoppingCart, Menu, AlertTriangle
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
-import { useSettingsStore } from '@/lib/store';
+import { useSettingsStore, useUIStore } from '@/lib/store';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
-export type NavbarVariant = 'storefront' | 'pos' | 'admin' | 'auth';
+export type NavbarVariant = 'pos' | 'admin' | 'auth';
 
 interface NavbarProps {
   variant: NavbarVariant;
@@ -26,6 +27,9 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const cart = useCartStore();
   const { storeName } = useSettingsStore();
+  const connectionStatus = useUIStore(state => state.connectionStatus);
+  const pathname = usePathname();
+  const isSettingsPage = pathname === '/admin/settings';
 
   const cartItemCount = cart.items.length;
 
@@ -35,10 +39,10 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
   if (variant === 'auth') {
     headerContent = (
       <header className="h-16 bg-muted/30 border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
-        <Link href="/" className="flex items-center gap-3 text-primary hover:opacity-80 transition-opacity">
+        <div className="flex items-center gap-3 text-primary">
           <ShoppingBag className="h-7 w-7" />
           <span className="font-bold text-xl tracking-tight hidden sm:block">{storeName}</span>
-        </Link>
+        </div>
         <ThemeToggle />
       </header>
     );
@@ -59,18 +63,26 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
             <ShoppingBag className="h-6 w-6 text-primary" />
             <span className="font-bold border-r border-border pr-2 ml-2">Admin</span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <div className={isSettingsPage ? "blur-[2px] opacity-20 pointer-events-none select-none" : ""}>
+              <LiveStatus status={connectionStatus} />
+            </div>
+            <ThemeToggle />
+          </div>
         </header>
 
         {/* Desktop Top Bar */}
-        <header className="hidden lg:flex h-16 shrink-0 items-center justify-end border-b border-border bg-muted/30 px-6 gap-4">
+        <header className="hidden lg:flex h-16 shrink-0 items-center justify-end border-b border-border bg-muted/30 px-6 gap-6">
+            <div className={isSettingsPage ? "blur-[2px] opacity-20 pointer-events-none select-none" : ""}>
+              <LiveStatus status={connectionStatus} />
+            </div>
             <ThemeToggle />
         </header>
       </>
     );
   }
-  // -- POS VARIANT --
-  else if (variant === 'pos') {
+  // -- POS VARIANT (Default for Staff) --
+  else {
     headerContent = (
       <header className="h-16 bg-muted/30 border-b border-border flex items-center justify-between px-4 lg:px-6 shrink-0">
         <div className="flex items-center gap-4">
@@ -84,96 +96,33 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
             </Link>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium hidden sm:block text-muted-foreground">
-            {user?.name} <span className="text-muted-foreground/60 font-normal">({user?.role})</span>
-          </span>
-          <ThemeToggle />
-          <Button variant="ghost" size="sm" onClick={() => setShowLogoutConfirm(true)} className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1">
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
-          <Button
-            className="lg:hidden relative"
-            variant="secondary"
-            size="sm"
-            onClick={onMobileCartToggle}
-          >
-            <ShoppingCart className="h-5 w-5" />
-            {cartItemCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center">
-                {cartItemCount}
-              </span>
-            )}
-          </Button>
-        </div>
-      </header>
-    );
-  }
-  // -- STOREFRONT VARIANT (default) --
-  else {
-    headerContent = (
-      <header className="h-16 bg-muted/30 border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
-        <Link href="/" className="flex items-center gap-3 text-primary hover:opacity-80 transition-opacity">
-          <ShoppingBag className="h-7 w-7" />
-          <span className="font-bold text-xl tracking-tight hidden sm:block">{storeName}</span>
-        </Link>
-
-        <div className="flex items-center gap-3 sm:gap-4">
-          {!user ? (
-            <Link href="/login">
-              <Button variant="outline" size="sm" className="gap-2">
-                <LogIn className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign In</span>
-              </Button>
-            </Link>
-          ) : (
-            <div className="flex items-center gap-2 sm:gap-3">
-              {(user.role === 'MANAGER' || user.role === 'ADMIN') && (
-                <Link href="/admin">
-                  <Button variant="ghost" size="sm" className="gap-2 text-info">
-                    <LayoutDashboard className="h-4 w-4" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </Button>
-                </Link>
+        <div className="flex items-center gap-4">
+          <div className={isSettingsPage ? "blur-[2px] opacity-20 pointer-events-none select-none" : ""}>
+            <LiveStatus status={connectionStatus} />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium hidden sm:block text-muted-foreground">
+              {user?.name} <span className="text-muted-foreground/60 font-normal">({user?.role})</span>
+            </span>
+            <ThemeToggle />
+            <Button variant="ghost" size="sm" onClick={() => setShowLogoutConfirm(true)} className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+            <Button
+              className="lg:hidden relative"
+              variant="secondary"
+              size="sm"
+              onClick={onMobileCartToggle}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartItemCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center">
+                  {cartItemCount}
+                </span>
               )}
-              {user.role === 'CASHIER' && (
-                <Link href="/pos">
-                  <Button variant="ghost" size="sm" className="gap-2 text-primary">
-                    <Calculator className="h-4 w-4" />
-                    <span className="hidden sm:inline">POS System</span>
-                  </Button>
-                </Link>
-              )}
-              <span className="text-sm font-medium text-muted-foreground hidden sm:block border-l pl-3 border-border">
-                Hi, {user.name}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            </div>
-          )}
-
-          <ThemeToggle />
-
-          <Button 
-            className="lg:hidden relative bg-primary hover:bg-primary/90 text-primary-foreground" 
-            size="sm"
-            onClick={onMobileCartToggle}
-          >
-            <ShoppingCart className="h-5 w-5" />
-            {cartItemCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center shadow-sm">
-                {cartItemCount}
-              </span>
-            )}
-          </Button>
+            </Button>
+          </div>
         </div>
       </header>
     );
@@ -194,15 +143,15 @@ export function Navbar({ variant, onMobileMenuToggle, onMobileCartToggle }: Navb
             <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <p className="text-sm font-medium">Are you sure you want to sign out? You will need to log back in to access the system components.</p>
+            <p className="text-sm font-medium">Are you sure you want to log out? You will need to log back in to access the system components.</p>
           </div>
           
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" autoFocus onClick={() => setShowLogoutConfirm(false)}>
+            <Button title='Cancel' variant="outline" autoFocus onClick={() => setShowLogoutConfirm(false)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={logout}>
-              Sign Out
+            <Button title='Confirm Log Out' variant="danger" onClick={logout}>
+              Log Out
             </Button>
           </div>
         </div>

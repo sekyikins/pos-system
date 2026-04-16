@@ -11,10 +11,10 @@ import { StaffRecord as UserRecord } from '@/lib/types';
 import { getUsers, addUser, updateUser, deleteUser } from '@/lib/db';
 import { useToastStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
-import { Plus, Search, Edit, Trash2, Loader2, ShieldCheck, ShieldAlert, ArrowUpDown, Calendar, UserCheck } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, ShieldCheck, ShieldAlert, ArrowUpDown, Calendar } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 const ROLE_BADGE = {
   ADMIN: { label: 'Admin', class: 'bg-destructive/10 text-destructive' },
@@ -42,11 +42,12 @@ export default function StaffPage() {
   const [addForm, setAddForm] = useState({ name: '', username: '', password: '', role: 'CASHIER' });
   const [editForm, setEditForm] = useState({ name: '', role: 'CASHIER', password: '' });
 
-  const { data: users, isLoading, connectionStatus, refetch } = useRealtimeTable<UserRecord>({
+  const { data: users, isLoading, refetch } = useRealtimeTable<UserRecord>({
     table: 'pos_staff',
     initialData: [],
     fetcher: getUsers,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-staff'
   });
 
   const processed = useMemo(() => {
@@ -141,14 +142,12 @@ export default function StaffPage() {
         ) : (
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              <UserCheck className="h-8 w-8 text-primary" />
               Staff Management
             </h1>
             <p className="text-sm text-muted-foreground font-medium">Coordinate system access and team coordination</p>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> Add Staff
           </Button>
@@ -156,8 +155,8 @@ export default function StaffPage() {
       </div>
 
       <Card className="border-2 border-border/50">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -194,14 +193,14 @@ export default function StaffPage() {
                 <option value="date-desc">Newest First</option>
                 <option value="date-asc">Oldest First</option>
               </select>
-              <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <div className="absolute right-3.5 top-4 pointer-events-none text-muted-foreground/60">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </div>
             </div>
           </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 py-0">
           {isLoading ? (
             <div className="rounded-xl overflow-hidden">
                {[...Array(5)].map((_, i) => (
@@ -220,9 +219,9 @@ export default function StaffPage() {
                ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-210px)] overflow-x-auto">
               <table className="w-full text-sm text-left align-middle">
-                <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                   <tr>
                     <th className="px-6 py-4">Employee</th>
                     <th className="px-6 py-4">Account Access</th>
@@ -250,7 +249,9 @@ export default function StaffPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-5 font-mono text-xs text-muted-foreground font-bold">@{u.username}</td>
+                        <td className="px-6 py-5">
+                          <CopyableId id={u.username} truncate={false} className="bg-muted/50 text-muted-foreground scale-90 origin-left" />
+                        </td>
                         <td className="px-6 py-5">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold tracking-wide ${roleBadge.class} border border-current/10 shadow-sm`}>
                             {u.role === 'ADMIN' ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}

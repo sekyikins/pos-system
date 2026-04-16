@@ -12,7 +12,6 @@ import { PurchaseOrder, PurchaseOrderItem, Product, Supplier } from '@/lib/types
 import { getPurchaseOrders, addPurchaseOrder, updatePurchaseOrderStatus, getProducts, getSuppliers } from '@/lib/db_extended';
 import { useToastStore, useSettingsStore } from '@/lib/store';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
 import { useAuth } from '@/lib/auth';
 
 type NewPurchaseOrderItem = Omit<PurchaseOrderItem, 'id' | 'poId' | 'subtotal' | 'createdAt' | 'productName'>;
@@ -30,11 +29,12 @@ export default function PurchaseOrdersPage() {
   const { currencySymbol } = useSettingsStore();
   const { user } = useAuth();
 
-  const { data: purchaseOrders, isLoading, connectionStatus, refetch } = useRealtimeTable<PurchaseOrder>({
+  const { data: purchaseOrders, isLoading, refetch } = useRealtimeTable<PurchaseOrder>({
     table: 'purchase_orders',
     initialData: [],
     fetcher: getPurchaseOrders,
-    refetchOnChange: true
+    refetchOnChange: true,
+    cacheKey: 'admin-po'
   });
 
   // Modal Form State
@@ -157,13 +157,12 @@ export default function PurchaseOrdersPage() {
         ) : (
           <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Truck className="h-8 w-8 text-primary" /> Purchase Orders
+              Purchase Orders
             </h1>
             <p className="text-sm text-muted-foreground font-medium">Manage restocking and supplier transactions</p>
           </div>
         )}
         <div className="flex items-center gap-4">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => setIsModalOpen(true)} className="gap-2 shadow-lg shadow-primary/20" disabled={isLoading}>
             <Plus className="h-4 w-4" /> New Order
           </Button>
@@ -217,11 +216,11 @@ export default function PurchaseOrdersPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border-2 border-border/50">
-          <CardHeader className="pb-0 border-b border-border/50">
+          <CardHeader className="border-b border-border/50">
              {isLoading ? (
                <div className="pb-6"><Skeleton className="h-11 w-full max-w-sm rounded-xl" /></div>
              ) : (
-               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6">
+               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="relative w-full max-w-sm">
                     <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
                     <Input 
@@ -245,7 +244,7 @@ export default function PurchaseOrdersPage() {
                 </div>
              )}
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="px-0 py-0">
             {isLoading ? (
               <div className="p-0">
                 {[...Array(5)].map((_, i) => (
@@ -260,9 +259,9 @@ export default function PurchaseOrdersPage() {
                 ))}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-[calc(100vh-210px)] overflow-x-auto">
                 <table className="w-full text-sm font-medium">
-                  <thead className="bg-muted/30 text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50">
+                  <thead className="sticky top-0 bg-muted text-[10px] uppercase font-bold text-muted-foreground/70 border-b border-border/50 z-20">
                     <tr>
                       <th className="p-5 text-left">Order Details</th>
                       <th className="p-5 text-left">Supplier</th>

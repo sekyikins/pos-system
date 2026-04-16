@@ -12,7 +12,7 @@ import { useToastStore } from '@/lib/store';
 import { Plus, Search, Edit, Trash2, User, Phone, Mail, Award, ArrowUpDown, Calendar, Monitor, Store, Layers } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useRealtimeTable } from '@/hooks/useRealtimeTable';
-import { LiveStatus } from '@/components/ui/LiveStatus';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 type SortKey = 'name' | 'date' | 'loyalty';
 
@@ -28,11 +28,12 @@ export default function CustomersPage() {
   const { addToast } = useToastStore();
   const [form, setForm] = useState({ name: '', phone: '', email: '' });
 
-  const { data: customers, isLoading, connectionStatus, refetch } = useRealtimeTable<Customer>({
+  const { data: customers, isLoading, refetch } = useRealtimeTable<Customer>({
     table: 'customers',
     initialData: [],
     fetcher: getAllCustomers,
     refetchOnChange: true,
+    cacheKey: 'admin-customers'
   });
 
   const processed = useMemo(() => {
@@ -125,13 +126,11 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <User className="h-8 w-8 text-primary" />
             Unified Customers
           </h1>
           <p className="text-sm text-muted-foreground font-medium">Overview of in-store, storefront, and omnichannel shoppers</p>
         </div>
         <div className="flex items-center gap-3">
-          <LiveStatus status={connectionStatus} />
           <Button onClick={() => setIsAddOpen(true)} className="gap-2 shrink-0 font-bold rounded-xl shadow-lg shadow-primary/20">
             <Plus className="h-4 w-4" /> New POS Customer
           </Button>
@@ -155,8 +154,8 @@ export default function CustomersPage() {
           ))
         ) : (
           <>
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="pt-6">
+            <Card className="bg-primary/5 border-primary/20 overflow-hidden">
+              <CardContent className="pt-6 flex">
                 <div className="flex items-start gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary">
                       <User className="h-6 w-6" />
@@ -168,8 +167,8 @@ export default function CustomersPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-info/5 border-info/20">
-              <CardContent className="pt-6">
+            <Card className="bg-info/5 border-info/20 overflow-hidden">
+              <CardContent className="pt-6 flex">
                 <div className="flex items-start gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-info/20 flex items-center justify-center text-info">
                       <Monitor className="h-6 w-6" />
@@ -181,8 +180,8 @@ export default function CustomersPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-success/5 border-success/20">
-              <CardContent className="pt-6">
+            <Card className="bg-success/5 border-success/20 overflow-hidden">
+              <CardContent className="pt-6 flex">
                 <div className="flex items-start gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-success/20 flex items-center justify-center text-success">
                       <Store className="h-6 w-6" />
@@ -194,8 +193,8 @@ export default function CustomersPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-warning/5 border-warning/20">
-              <CardContent className="pt-6">
+            <Card className="bg-warning/5 border-warning/20 overflow-hidden">
+              <CardContent className="pt-6 flex">
                 <div className="flex items-start gap-4">
                    <div className="h-12 w-12 rounded-2xl bg-warning/20 flex items-center justify-center text-warning">
                       <Layers className="h-6 w-6" />
@@ -212,8 +211,8 @@ export default function CustomersPage() {
       </div>
 
       <Card className="border-2 border-border/50">
-        <CardHeader className="pb-0 border-b border-border/50">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pb-6">
+        <CardHeader className="border-b border-border/50">
+          <div className="flex flex-col md:flex-row justify-between items-start gap-4">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/60" />
               <Input 
@@ -253,14 +252,14 @@ export default function CustomersPage() {
                   <option value="date-desc">Newest First</option>
                   <option value="date-asc">Oldest First</option>
                 </select>
-                <div className="absolute right-3.5 top-3.5 pointer-events-none text-muted-foreground/60">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                <div className="absolute right-3.5 top-4 pointer-events-none text-muted-foreground/60">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </div>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 py-0">
           {isLoading ? (
             <div className="space-y-0">
               {[...Array(6)].map((_, i) => (
@@ -279,9 +278,9 @@ export default function CustomersPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[calc(100vh-200px)] overflow-x-auto">
               <table className="w-full text-sm text-left align-middle">
-                <thead className="bg-muted/30 text-xs uppercase font-bold text-muted-foreground/70">
+                <thead className="sticky top-0 bg-muted text-xs uppercase font-bold text-muted-foreground/70 z-20">
                   <tr>
                     <th className="px-6 py-4">Customer</th>
                     <th className="px-6 py-4">Contact Details</th>
@@ -306,7 +305,10 @@ export default function CustomersPage() {
                           </div>
                           <div>
                              <p className="font-bold text-foreground text-base">{c.name}</p>
-                             <p className="text-[10px] text-muted-foreground font-mono">ID: {c.id.slice(0,8).toUpperCase()}</p>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground font-mono">ID:</span>
+                                <CopyableId id={c.id} className="scale-75 origin-left" />
+                              </div>
                           </div>
                         </div>
                       </td>
